@@ -39,6 +39,52 @@ export function PortalDashboardClient({
     }
   };
 
+  const handleDownloadInvoice = async (invoiceId: string, invoiceNumber: string) => {
+    try {
+      const response = await fetch(`/api/portal/invoices/${invoiceId}/download`);
+
+      if (!response.ok) {
+        throw new Error('Failed to download invoice');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Invoice-${invoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download invoice. Please try again.');
+    }
+  };
+
+  const handleDownloadDocument = async (documentId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/portal/documents/${documentId}/download`);
+
+      if (!response.ok) {
+        throw new Error('Failed to download document');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Failed to download document. Please try again.');
+    }
+  };
+
   const getInvoiceStatusColor = (status: string) => {
     switch (status) {
       case 'paid':
@@ -188,7 +234,11 @@ export function PortalDashboardClient({
                         <span className="text-sm font-semibold text-slate-900">
                           CHF {invoice.total?.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
                         </span>
-                        <Button size="sm" variant="ghost">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDownloadInvoice(invoice.id, invoice.invoice_number || invoice.id.slice(0, 8))}
+                        >
                           <Download className="h-4 w-4" />
                         </Button>
                       </div>
@@ -229,7 +279,11 @@ export function PortalDashboardClient({
                           </p>
                         </div>
                       </div>
-                      <Button size="sm" variant="ghost">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDownloadDocument(doc.id, doc.name)}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
                     </div>
@@ -244,27 +298,74 @@ export function PortalDashboardClient({
         {projects.length > 0 && (
           <Card className="border-slate-200 bg-white">
             <CardHeader>
-              <CardTitle className="text-slate-900">Projects</CardTitle>
+              <CardTitle className="text-slate-900">Your Projects</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
                 {projects.map((project) => (
                   <div
                     key={project.id}
-                    className="p-4 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                    className="p-5 rounded-lg border border-slate-200 hover:border-slate-300 transition-all bg-white"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <h3 className="font-semibold text-slate-900">
-                        {project.name}
-                      </h3>
-                      <Badge className={getProjectStatusColor(project.status)}>
-                        {project.status}
-                      </Badge>
+                    {/* Project Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="font-semibold text-lg text-slate-900">
+                            {project.name}
+                          </h3>
+                          <Badge className={getProjectStatusColor(project.status)}>
+                            {project.status?.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                        {project.description && (
+                          <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                            {project.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    {project.description && (
-                      <p className="text-sm text-slate-600 line-clamp-2">
-                        {project.description}
-                      </p>
+
+                    {/* Project Timeline */}
+                    {(project.start_date || project.end_date) && (
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-slate-100">
+                        {project.start_date && (
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              Started: {format(new Date(project.start_date), 'dd MMM yyyy')}
+                            </span>
+                          </div>
+                        )}
+                        {project.end_date && (
+                          <div className="flex items-center gap-2 text-xs text-slate-500">
+                            <Clock className="h-3 w-3" />
+                            <span>
+                              {project.status === 'completed' ? 'Completed' : 'Due'}: {format(new Date(project.end_date), 'dd MMM yyyy')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Project Progress (if available) */}
+                    {project.progress !== undefined && project.progress !== null && (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-slate-600">
+                            Progress
+                          </span>
+                          <span className="text-xs font-semibold text-slate-900">
+                            {project.progress}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all"
+                            style={{ width: `${project.progress}%` }}
+                          />
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))}
