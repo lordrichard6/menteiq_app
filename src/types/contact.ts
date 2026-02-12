@@ -13,6 +13,11 @@ export interface Contact {
     notes: string[]
     createdAt: Date
     updatedAt: Date
+    // Portal access fields
+    portal_enabled?: boolean
+    portal_token?: string
+    portal_invited_at?: Date | string
+    last_portal_login?: Date | string
 }
 
 export interface CreateContactInput {

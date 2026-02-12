@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useInvoiceStore } from '@/stores/invoice-store'
 import { useProjectStore } from '@/stores/project-store'
+import { PortalAccessSection } from './portal-access-section'
 import { Mail, Phone, Building2, Plus, FileText, FolderKanban, CheckSquare } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo } from 'react'
@@ -106,6 +107,9 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Client Portal Access */}
+            <PortalAccessSection contact={contact} />
 
             {/* Quick Actions */}
             <Card className="border-slate-200 bg-white">
