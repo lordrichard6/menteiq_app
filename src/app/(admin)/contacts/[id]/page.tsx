@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Edit, Trash2, Loader2, Download } from 'lucide-react'
+import { Checkbox } from '@/components/ui/checkbox'
+import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { STATUS_LABELS, STATUS_COLORS, ContactStatus } from '@/types/contact'
 import { TagsInput } from '@/components/contacts/tags-input'
@@ -44,6 +45,8 @@ export default function ContactDetailPage() {
     const [showEditDialog, setShowEditDialog] = useState(false)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [showExportMenu, setShowExportMenu] = useState(false)
+    const [gdprDelete, setGdprDelete] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Fetch contacts on mount if needed
     useEffect(() => {
@@ -56,8 +59,45 @@ export default function ContactDetailPage() {
     const contact = contacts.find(c => c.id === contactId)
 
     const handleDelete = async () => {
-        await deleteContact(contactId)
-        router.push('/contacts')
+        setIsDeleting(true)
+        try {
+            if (gdprDelete) {
+                // GDPR permanent deletion
+                const response = await fetch(`/api/contacts/${contactId}/gdpr-delete`, {
+                    method: 'DELETE',
+                })
+                const data = await response.json()
+
+                if (response.ok) {
+                    // Download deletion certificate
+                    const blob = new Blob(
+                        [JSON.stringify(data.deletion_certificate, null, 2)],
+                        { type: 'application/json' }
+                    )
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `deletion-certificate-${contactId}.json`
+                    a.click()
+                    URL.revokeObjectURL(url)
+
+                    router.push('/contacts')
+                } else {
+                    alert('Failed to delete contact: ' + data.error)
+                }
+            } else {
+                // Regular deletion
+                await deleteContact(contactId)
+                router.push('/contacts')
+            }
+        } catch (error) {
+            console.error('Delete error:', error)
+            alert('Failed to delete contact')
+        } finally {
+            setIsDeleting(false)
+            setShowDeleteDialog(false)
+            setGdprDelete(false)
+        }
     }
 
     const handleExport = (format: 'json' | 'csv') => {
@@ -243,21 +283,72 @@ export default function ContactDetailPage() {
             />
 
             {/* Delete Confirmation */}
-            <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-                <AlertDialogContent>
+            <AlertDialog open={showDeleteDialog} onOpenChange={(open) => {
+                setShowDeleteDialog(open)
+                if (!open) setGdprDelete(false)
+            }}>
+                <AlertDialogContent className="max-w-md">
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Delete Contact?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Are you sure you want to delete {contact.name}? This action cannot be undone.
+                        <AlertDialogTitle className="flex items-center gap-2">
+                            <Trash2 className="h-5 w-5 text-red-600" />
+                            Delete Contact?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="space-y-3">
+                            <p>
+                                Are you sure you want to delete <strong>{contact.name}</strong>?
+                            </p>
+
+                            {/* GDPR Permanent Delete Option */}
+                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                    <Checkbox
+                                        id="gdpr-delete"
+                                        checked={gdprDelete}
+                                        onCheckedChange={(checked) => setGdprDelete(checked as boolean)}
+                                        className="mt-0.5"
+                                    />
+                                    <div className="flex-1">
+                                        <label
+                                            htmlFor="gdpr-delete"
+                                            className="text-sm font-medium text-red-900 cursor-pointer flex items-center gap-2"
+                                        >
+                                            <AlertTriangle className="h-4 w-4" />
+                                            GDPR Permanent Deletion
+                                        </label>
+                                        <p className="text-xs text-red-700 mt-1">
+                                            Permanently delete ALL data related to this contact including invoices,
+                                            tasks, projects, and activity history. This action <strong>cannot be
+                                            undone</strong>. A deletion certificate will be generated for compliance.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {!gdprDelete && (
+                                <p className="text-xs text-slate-500">
+                                    Regular deletion will remove the contact but may retain some data for business
+                                    records.
+                                </p>
+                            )}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDelete}
-                            className="bg-red-600 hover:bg-red-700"
+                            disabled={isDeleting}
+                            className={gdprDelete ? 'bg-red-700 hover:bg-red-800' : 'bg-red-600 hover:bg-red-700'}
                         >
-                            Delete
+                            {isDeleting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Deleting...
+                                </>
+                            ) : (
+                                <>
+                                    {gdprDelete ? 'Permanently Delete (GDPR)' : 'Delete'}
+                                </>
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
