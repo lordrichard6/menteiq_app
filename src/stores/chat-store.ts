@@ -78,21 +78,21 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            
+
             // Get current user
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Not authenticated')
-            
+
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('org_id')
+                .select('tenant_id')
                 .eq('id', user.id)
                 .single()
 
-            if (!profile?.org_id) throw new Error('No organization found')
+            if (!profile?.tenant_id) throw new Error('No organization found')
 
             const dbData = {
-                org_id: profile.org_id,
+                tenant_id: profile.tenant_id,
                 user_id: user.id,
                 title: input?.title || 'New Conversation',
                 model: input?.model || 'gpt-4o-mini',
@@ -131,7 +131,7 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            
+
             // Messages will be deleted via CASCADE
             const { error } = await supabase
                 .from('ai_conversations')

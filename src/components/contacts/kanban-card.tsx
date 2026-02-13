@@ -4,23 +4,17 @@ import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { MoreHorizontal, Phone, Mail, Building2 } from "lucide-react"
+import { Phone, Mail, Building2 } from "lucide-react"
 import { Contact } from "@/types/contact"
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { QuickActionsMenu } from './quick-actions-menu'
 
 interface KanbanCardProps {
     contact: Contact
+    onDelete: (id: string) => void
 }
 
-export function KanbanCard({ contact }: KanbanCardProps) {
+export function KanbanCard({ contact, onDelete }: KanbanCardProps) {
     const router = useRouter()
     const {
         attributes,
@@ -54,28 +48,21 @@ export function KanbanCard({ contact }: KanbanCardProps) {
                     <div className="flex justify-between items-start">
                         <div>
                             <h4 className="font-medium text-sm text-[#3D4A67] line-clamp-1">
-                                {contact.name}
+                                {contact.isCompany ? contact.companyName : `${contact.firstName} ${contact.lastName}`}
                             </h4>
-                            {contact.company && (
+                            {contact.companyName && (
                                 <div className="flex items-center text-xs text-slate-500 mt-1">
                                     <Building2 className="h-3 w-3 mr-1" />
-                                    <span className="line-clamp-1">{contact.company}</span>
+                                    <span className="line-clamp-1">{contact.companyName}</span>
                                 </div>
                             )}
                         </div>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 -mr-2">
-                                    <MoreHorizontal className="h-4 w-4 text-slate-400" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => router.push(`/contacts/${contact.id}`)}>
-                                    View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <QuickActionsMenu
+                                contact={contact}
+                                onDelete={() => onDelete(contact.id)}
+                            />
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-3">

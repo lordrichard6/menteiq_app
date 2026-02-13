@@ -6,9 +6,9 @@ interface TaskStore {
     tasks: Task[]
     isLoading: boolean
     error: string | null
-    
+
     // Actions
-    fetchTasks: () => Promise<void>
+    fetchTasks: (projectId?: string) => Promise<void>
     addTask: (input: CreateTaskInput) => Promise<Task | null>
     updateTask: (id: string, updates: Partial<Task>) => Promise<void>
     deleteTask: (id: string) => Promise<void>
@@ -28,6 +28,8 @@ function dbToTask(row: any): Task {
         dueDate: row.due_date ? new Date(row.due_date) : undefined,
         projectId: row.project_id,
         contactId: row.contact_id,
+        milestone_id: row.milestone_id,
+        dependencies: row.task_dependencies?.map((d: any) => d.depends_on_task_id) || [],
         subtasks: [], // Subtasks not stored in DB yet
         createdAt: new Date(row.created_at),
         updatedAt: new Date(row.updated_at),
@@ -39,14 +41,25 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
     isLoading: false,
     error: null,
 
-    fetchTasks: async () => {
+    fetchTasks: async (projectId) => {
         set({ isLoading: true, error: null })
         try {
             const supabase = createClient()
-            const { data, error } = await supabase
+            let query = supabase
                 .from('tasks')
-                .select('*')
+                .select(`
+                    *,
+                    task_dependencies!task_id (
+                        depends_on_task_id
+                    )
+                `)
                 .order('created_at', { ascending: false })
+
+            if (projectId) {
+                query = query.eq('project_id', projectId)
+            }
+
+            const { data, error } = await query
 
             if (error) throw error
 
@@ -62,17 +75,17 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            
+
             // Get current user's tenant_id
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Not authenticated')
-            
+
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('tenant_id')
                 .eq('id', user.id)
                 .single()
-            
+
             if (!profile?.tenant_id) throw new Error('No organization found')
 
             const dbData = {
@@ -85,6 +98,7 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
                 due_date: input.dueDate?.toISOString().split('T')[0] || null,
                 project_id: input.projectId || null,
                 contact_id: input.contactId || null,
+                milestone_id: input.milestone_id || null,
             }
 
             const { data, error } = await supabase
@@ -96,6 +110,23 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
             if (error) throw error
 
             const newTask = dbToTask(data)
+
+            // Add dependencies if any
+            if (input.dependencyIds && input.dependencyIds.length > 0) {
+                const depData = input.dependencyIds.map(depId => ({
+                    task_id: newTask.id,
+                    depends_on_task_id: depId,
+                    tenant_id: profile.tenant_id
+                }))
+                const { error: depError } = await supabase
+                    .from('task_dependencies')
+                    .insert(depData)
+                if (depError) throw depError
+
+                // Refresh task to include dependencies in the state
+                newTask.dependencies = input.dependencyIds
+            }
+
             set((state) => ({ tasks: [newTask, ...state.tasks] }))
             return newTask
         } catch (error: any) {
@@ -109,9 +140,9 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            
+
             const dbUpdates: any = { updated_at: new Date().toISOString() }
-            
+
             if (updates.title !== undefined) dbUpdates.title = updates.title
             if (updates.description !== undefined) dbUpdates.description = updates.description
             if (updates.status !== undefined) dbUpdates.status = updates.status
@@ -121,6 +152,7 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
             }
             if (updates.projectId !== undefined) dbUpdates.project_id = updates.projectId
             if (updates.contactId !== undefined) dbUpdates.contact_id = updates.contactId
+            if (updates.milestone_id !== undefined) dbUpdates.milestone_id = updates.milestone_id
 
             const { error } = await supabase
                 .from('tasks')
@@ -128,6 +160,25 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
                 .eq('id', id)
 
             if (error) throw error
+
+            // Handle dependency updates if provided
+            if (updates.dependencies !== undefined) {
+                // Simplest: delete all and re-add
+                await supabase.from('task_dependencies').delete().eq('task_id', id)
+
+                if (updates.dependencies.length > 0) {
+                    const { data: { user } } = await supabase.auth.getUser()
+                    const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', user?.id).single()
+
+                    const depData = updates.dependencies.map(depId => ({
+                        task_id: id,
+                        depends_on_task_id: depId,
+                        tenant_id: profile?.tenant_id
+                    }))
+                    const { error: depError } = await supabase.from('task_dependencies').insert(depData)
+                    if (depError) throw depError
+                }
+            }
 
             set((state) => ({
                 tasks: state.tasks.map((t) =>

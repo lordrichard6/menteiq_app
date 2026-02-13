@@ -4,10 +4,12 @@ export type ContactStatus = 'lead' | 'opportunity' | 'client' | 'churned'
 
 export interface Contact {
     id: string
-    name: string
+    firstName: string
+    lastName: string
+    isCompany: boolean
+    companyName?: string
     email: string
     phone?: string
-    company?: string
     status: ContactStatus
     tags: string[]
     notes: string[]
@@ -21,10 +23,12 @@ export interface Contact {
 }
 
 export interface CreateContactInput {
-    name: string
+    firstName: string
+    lastName: string
+    isCompany: boolean
+    companyName?: string
     email: string
     phone?: string
-    company?: string
     status?: ContactStatus
     tags?: string[]
 }

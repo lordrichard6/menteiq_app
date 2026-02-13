@@ -206,11 +206,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('org_id')
+                .select('tenant_id')
                 .eq('id', user.id)
                 .single()
 
-            if (!profile?.org_id) return
+            if (!profile?.tenant_id) return
 
             const results: any[] = []
 
@@ -218,7 +218,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             const { data: contacts } = await supabase
                 .from('contacts')
                 .select('id, first_name, last_name, company_name, email, is_company')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
                 .or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,company_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
                 .limit(3)
 
@@ -229,7 +229,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                         label: contact.is_company
                             ? contact.company_name || 'Unnamed Company'
                             : `${contact.first_name || ''} ${contact.last_name || ''}`.trim() ||
-                              'Unnamed Contact',
+                            'Unnamed Contact',
                         description: contact.email || undefined,
                         icon: <User className="h-4 w-4" />,
                         action: () => {
@@ -245,7 +245,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             const { data: projects } = await supabase
                 .from('projects')
                 .select('id, name')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
                 .ilike('name', `%${searchQuery}%`)
                 .limit(3)
 

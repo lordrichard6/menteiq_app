@@ -84,29 +84,55 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                 <CardHeader>
                     <CardTitle className="text-[#3D4A67]">Contact Information</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                    {contact.email && (
-                        <div className="flex items-center gap-3">
-                            <Mail className="h-4 w-4 text-slate-500" />
-                            <a href={`mailto:${contact.email}`} className="text-slate-700 hover:text-[#3D4A67]">
-                                {contact.email}
-                            </a>
+                <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <span className="text-xs text-slate-500 uppercase font-semibold">Type</span>
+                            <div className="text-sm text-slate-700">{contact.isCompany ? 'Company' : 'Individual'}</div>
                         </div>
-                    )}
-                    {contact.phone && (
-                        <div className="flex items-center gap-3">
-                            <Phone className="h-4 w-4 text-slate-500" />
-                            <a href={`tel:${contact.phone}`} className="text-slate-700 hover:text-[#3D4A67]">
-                                {contact.phone}
-                            </a>
-                        </div>
-                    )}
-                    {contact.company && (
-                        <div className="flex items-center gap-3">
-                            <Building2 className="h-4 w-4 text-slate-500" />
-                            <span className="text-slate-700">{contact.company}</span>
-                        </div>
-                    )}
+                        {contact.isCompany ? (
+                            <div className="space-y-1">
+                                <span className="text-xs text-slate-500 uppercase font-semibold">Company Name</span>
+                                <div className="text-sm text-slate-700">{contact.companyName}</div>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="space-y-1">
+                                    <span className="text-xs text-slate-500 uppercase font-semibold">First Name</span>
+                                    <div className="text-sm text-slate-700">{contact.firstName}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <span className="text-xs text-slate-500 uppercase font-semibold">Last Name</span>
+                                    <div className="text-sm text-slate-700">{contact.lastName || '-'}</div>
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-4 space-y-3">
+                        {contact.email && (
+                            <div className="flex items-center gap-3">
+                                <Mail className="h-4 w-4 text-slate-500" />
+                                <a href={`mailto:${contact.email}`} className="text-slate-700 hover:text-[#3D4A67]">
+                                    {contact.email}
+                                </a>
+                            </div>
+                        )}
+                        {contact.phone && (
+                            <div className="flex items-center gap-3">
+                                <Phone className="h-4 w-4 text-slate-500" />
+                                <a href={`tel:${contact.phone}`} className="text-slate-700 hover:text-[#3D4A67]">
+                                    {contact.phone}
+                                </a>
+                            </div>
+                        )}
+                        {!contact.isCompany && contact.companyName && (
+                            <div className="flex items-center gap-3">
+                                <Building2 className="h-4 w-4 text-slate-500" />
+                                <span className="text-slate-700">{contact.companyName}</span>
+                            </div>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
 

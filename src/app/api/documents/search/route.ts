@@ -20,14 +20,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's org_id
+    // Get user's tenant_id
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single();
 
-    if (!profile?.org_id) {
+    if (!profile?.tenant_id) {
       return NextResponse.json({ error: 'No organization found' }, { status: 400 });
     }
 
@@ -57,14 +57,14 @@ export async function GET(request: NextRequest) {
 
     switch (method) {
       case 'vector':
-        results = await searchDocuments(query, profile.org_id, options);
+        results = await searchDocuments(query, profile.tenant_id, options);
         break;
       case 'keyword':
-        results = await keywordSearchDocuments(query, profile.org_id, options);
+        results = await keywordSearchDocuments(query, profile.tenant_id, options);
         break;
       case 'hybrid':
       default:
-        results = await hybridSearch(query, profile.org_id, options);
+        results = await hybridSearch(query, profile.tenant_id, options);
         break;
     }
 
@@ -101,14 +101,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's org_id
+    // Get user's tenant_id
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single();
 
-    if (!profile?.org_id) {
+    if (!profile?.tenant_id) {
       return NextResponse.json({ error: 'No organization found' }, { status: 400 });
     }
 
@@ -138,14 +138,14 @@ export async function POST(request: NextRequest) {
 
     switch (method) {
       case 'vector':
-        results = await searchDocuments(query, profile.org_id, options);
+        results = await searchDocuments(query, profile.tenant_id, options);
         break;
       case 'keyword':
-        results = await keywordSearchDocuments(query, profile.org_id, options);
+        results = await keywordSearchDocuments(query, profile.tenant_id, options);
         break;
       case 'hybrid':
       default:
-        results = await hybridSearch(query, profile.org_id, options);
+        results = await hybridSearch(query, profile.tenant_id, options);
         break;
     }
 

@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge"
 interface KanbanColumnProps {
     id: ContactStatus
     contacts: Contact[]
+    onDeleteContact: (id: string) => void
 }
 
-export function KanbanColumn({ id, contacts }: KanbanColumnProps) {
+export function KanbanColumn({ id, contacts, onDeleteContact }: KanbanColumnProps) {
     const { setNodeRef } = useDroppable({ id })
 
     // Filter contacts for this column
@@ -27,7 +28,7 @@ export function KanbanColumn({ id, contacts }: KanbanColumnProps) {
 
             <div className="flex-1 overflow-y-auto px-1 space-y-3 pb-4">
                 {columnContacts.map((contact) => (
-                    <KanbanCard key={contact.id} contact={contact} />
+                    <KanbanCard key={contact.id} contact={contact} onDelete={onDeleteContact} />
                 ))}
                 {columnContacts.length === 0 && (
                     <div className="h-24 flex items-center justify-center text-xs text-slate-400 border-2 border-dashed border-slate-100 rounded-lg">

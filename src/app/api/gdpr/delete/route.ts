@@ -30,7 +30,7 @@ export async function POST(req: Request) {
         // Get user profile
         const { data: profile } = await supabase
             .from('profiles')
-            .select('org_id, role')
+            .select('tenant_id, role')
             .eq('id', user.id)
             .single()
 
@@ -39,11 +39,11 @@ export async function POST(req: Request) {
         }
 
         // If user is an org owner, prevent deletion if there are other members
-        if (profile.role === 'owner' && profile.org_id) {
+        if (profile.role === 'owner' && profile.tenant_id) {
             const { data: orgMembers, error: membersError } = await supabase
                 .from('profiles')
                 .select('id')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
 
             if (membersError) throw membersError
 
@@ -147,18 +147,18 @@ export async function POST(req: Request) {
         }
 
         // 5. If user is the last/only member of the org, delete the org and all its data
-        if (profile.org_id) {
+        if (profile.tenant_id) {
             const { data: orgMembers } = await supabase
                 .from('profiles')
                 .select('id')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
 
             // If this is the only member, delete the organization (CASCADE deletes everything)
             if (orgMembers && orgMembers.length === 1) {
                 await supabase
                     .from('organizations')
                     .delete()
-                    .eq('id', profile.org_id)
+                    .eq('id', profile.tenant_id)
             }
         }
 
@@ -208,7 +208,7 @@ export async function GET(req: Request) {
         // Get user profile
         const { data: profile } = await supabase
             .from('profiles')
-            .select('org_id, role')
+            .select('tenant_id, role')
             .eq('id', user.id)
             .single()
 
@@ -280,11 +280,11 @@ export async function GET(req: Request) {
         preview.itemsToDelete.tokenUsage = tokenCount || 0
 
         // Check if user is org owner with other members
-        if (profile.role === 'owner' && profile.org_id) {
+        if (profile.role === 'owner' && profile.tenant_id) {
             const { data: orgMembers } = await supabase
                 .from('profiles')
                 .select('id')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
 
             if (orgMembers && orgMembers.length > 1) {
                 preview.warnings.push(

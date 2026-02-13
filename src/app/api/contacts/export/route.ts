@@ -20,13 +20,16 @@ export async function GET(request: NextRequest) {
     // Get user's organization
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile?.org_id) {
+    if (profileError || !profile?.tenant_id) {
       return NextResponse.json(
-        { error: 'Organization not found' },
+        {
+          error: 'Organization not found',
+          details: 'Your user profile is not linked to an organization. Please try logging out and back in, or contact support.'
+        },
         { status: 404 }
       )
     }
@@ -41,7 +44,7 @@ export async function GET(request: NextRequest) {
     const { data: contacts, error: fetchError } = await supabase
       .from('contacts')
       .select('*')
-      .eq('org_id', profile.org_id)
+      .eq('tenant_id', profile.tenant_id)
       .order('created_at', { ascending: false })
 
     if (fetchError) {
@@ -51,55 +54,53 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    if (!contacts || contacts.length === 0) {
-      return NextResponse.json(
-        { error: 'No contacts to export' },
-        { status: 404 }
-      )
-    }
+    // If no contacts, we'll still proceed to generate a file with headers only
+    const hasContacts = contacts && contacts.length > 0;
 
     // Transform contacts based on selected fields
-    const exportData = contacts.map((contact: any) => {
-      const row: any = {}
+    const exportData = hasContacts
+      ? contacts.map((contact: any) => {
+        const row: any = {}
+        if (fields.includes('name')) {
+          const name = contact.is_company
+            ? contact.company_name
+            : [contact.first_name, contact.last_name].filter(Boolean).join(' ')
+          row['Name'] = name || contact.email || 'Unknown'
+        }
+        if (fields.includes('email')) row['Email'] = contact.email || ''
+        if (fields.includes('phone')) row['Phone'] = contact.phone || ''
+        if (fields.includes('company')) row['Company'] = contact.is_company ? '' : (contact.company_name || '')
+        if (fields.includes('status')) row['Status'] = contact.status || 'lead'
+        if (fields.includes('tags')) row['Tags'] = Array.isArray(contact.tags) ? contact.tags.join(', ') : ''
+        if (fields.includes('createdAt')) {
+          row['Created Date'] = contact.created_at ? new Date(contact.created_at).toISOString().split('T')[0] : ''
+        }
+        return row
+      })
+      : []
 
-      if (fields.includes('name')) {
-        const name = contact.is_company
-          ? contact.company_name
-          : [contact.first_name, contact.last_name].filter(Boolean).join(' ')
-        row['Name'] = name || contact.email || 'Unknown'
+    // For PapaParse/XLSX to work correctly with empty data, we provide the columns
+    const columns = fields.map(field => {
+      const headerMap: any = {
+        'name': 'Name',
+        'email': 'Email',
+        'phone': 'Phone',
+        'company': 'Company',
+        'status': 'Status',
+        'tags': 'Tags',
+        'createdAt': 'Created Date'
       }
-
-      if (fields.includes('email')) {
-        row['Email'] = contact.email || ''
-      }
-
-      if (fields.includes('phone')) {
-        row['Phone'] = contact.phone || ''
-      }
-
-      if (fields.includes('company')) {
-        row['Company'] = contact.is_company ? '' : (contact.company_name || '')
-      }
-
-      if (fields.includes('status')) {
-        row['Status'] = contact.status || 'lead'
-      }
-
-      if (fields.includes('tags')) {
-        row['Tags'] = Array.isArray(contact.tags) ? contact.tags.join(', ') : ''
-      }
-
-      if (fields.includes('createdAt')) {
-        row['Created Date'] = contact.created_at ? new Date(contact.created_at).toISOString().split('T')[0] : ''
-      }
-
-      return row
+      return headerMap[field] || field
     })
 
     // Generate file based on format
     if (format === 'csv') {
       // Generate CSV
-      const csv = Papa.unparse(exportData)
+      // Generate CSV
+      const csv = Papa.unparse({
+        fields: columns,
+        data: exportData
+      })
       const filename = `contacts-export-${new Date().toISOString().split('T')[0]}.csv`
 
       return new NextResponse(csv, {
@@ -110,7 +111,10 @@ export async function GET(request: NextRequest) {
       })
     } else if (format === 'xlsx') {
       // Generate Excel
-      const worksheet = XLSX.utils.json_to_sheet(exportData)
+      // Generate Excel
+      const worksheet = exportData.length > 0
+        ? XLSX.utils.json_to_sheet(exportData)
+        : XLSX.utils.aoa_to_sheet([columns])
       const workbook = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts')
 

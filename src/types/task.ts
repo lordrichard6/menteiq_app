@@ -12,6 +12,8 @@ export interface Task {
     dueDate?: Date
     projectId?: string
     contactId?: string
+    milestone_id?: string
+    dependencies?: string[]
     subtasks: { id: string; title: string; completed: boolean }[]
     createdAt: Date
     updatedAt: Date
@@ -25,6 +27,8 @@ export interface CreateTaskInput {
     dueDate?: Date
     projectId?: string
     contactId?: string
+    milestone_id?: string
+    dependencyIds?: string[]
 }
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {

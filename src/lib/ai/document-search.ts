@@ -34,7 +34,7 @@ export interface SearchOptions {
  */
 export async function searchDocuments(
   query: string,
-  orgId: string,
+  tenantId: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
   const {
@@ -59,7 +59,7 @@ export async function searchDocuments(
     // This uses a custom Postgres function for efficient similarity search
     const { data, error } = await supabase.rpc('match_document_chunks', {
       query_embedding: queryEmbedding,
-      match_org_id: orgId,
+      match_tenant_id: tenantId,
       match_threshold: threshold,
       match_count: limit,
       match_visibility: visibility === 'all' ? null : visibility,
@@ -102,7 +102,7 @@ export async function searchDocuments(
  */
 export async function hybridSearch(
   query: string,
-  orgId: string,
+  tenantId: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
   const { limit = 5 } = options;
@@ -110,8 +110,8 @@ export async function hybridSearch(
   try {
     // Run both searches in parallel
     const [vectorResults, keywordResults] = await Promise.all([
-      searchDocuments(query, orgId, { ...options, limit: limit * 2 }),
-      keywordSearchDocuments(query, orgId, options),
+      searchDocuments(query, tenantId, { ...options, limit: limit * 2 }),
+      keywordSearchDocuments(query, tenantId, options),
     ]);
 
     // Combine and deduplicate results
@@ -147,7 +147,7 @@ export async function hybridSearch(
  */
 export async function keywordSearchDocuments(
   query: string,
-  orgId: string,
+  tenantId: string,
   options: SearchOptions = {}
 ): Promise<SearchResult[]> {
   const {
@@ -178,10 +178,10 @@ export async function keywordSearchDocuments(
           visibility,
           project_id,
           contact_id,
-          org_id
+          tenant_id
         )
       `)
-      .eq('documents.org_id', orgId)
+      .eq('documents.tenant_id', tenantId)
       .textSearch('content', query, {
         type: 'websearch',
         config: 'english',
@@ -260,7 +260,10 @@ export async function getRelatedChunks(
       return [];
     }
 
-    return data || [];
+    return (data || []).map((row: any) => ({
+      content: row.content,
+      index: row.chunk_index,
+    }));
   } catch (error) {
     console.error('Get related chunks error:', error);
     return [];

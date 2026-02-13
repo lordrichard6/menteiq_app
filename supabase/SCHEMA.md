@@ -67,7 +67,7 @@ User profiles linked to Supabase Auth.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | References auth.users(id) |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | role | user_role | 'owner' or 'member' |
 | full_name | text | Display name |
 | email | text | Email address |
@@ -81,7 +81,7 @@ Hybrid Party Model (Person or Organization).
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | is_company | boolean | true = org, false = person |
 | company_uid | text | Zefix/NIF/VIES identifier |
 | company_name | text | Company name |
@@ -102,7 +102,7 @@ Invoice data with Swiss QR-Bill support.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | project_id | uuid | References projects(id) |
 | contact_id | uuid | References contacts(id) |
 | invoice_number | text | Sequential invoice number |
@@ -121,7 +121,7 @@ AI chat conversations.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | user_id | uuid | References profiles(id) |
 | contact_id | uuid | Optional context contact |
 | project_id | uuid | Optional context project |
@@ -149,7 +149,7 @@ Token usage tracking for billing.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | user_id | uuid | References profiles(id) |
 | model | text | AI model used |
 | tokens_in | integer | Input tokens |
@@ -167,7 +167,7 @@ Uploaded documents with RAG metadata.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | project_id | uuid | References projects(id) |
 | contact_id | uuid | References contacts(id) |
 | name | text | File name |
@@ -197,7 +197,7 @@ Task management.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | contact_id | uuid | References contacts(id) |
 | project_id | uuid | References projects(id) |
 | title | text | Task title |
@@ -217,7 +217,7 @@ Project management.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | contact_id | uuid | References contacts(id) |
 | name | text | Project name |
 | description | text | Project description |
@@ -232,7 +232,7 @@ External calendar sync.
 | Column | Type | Description |
 |--------|------|-------------|
 | id | uuid | Primary key |
-| org_id | uuid | References organizations(id) |
+| tenant_id | uuid | References organizations(id) |
 | project_id | uuid | References projects(id) |
 | contact_id | uuid | References contacts(id) |
 | external_event_id | text | Google/Outlook event ID |
@@ -278,7 +278,7 @@ All tables have RLS enabled with organization-level isolation:
 ## Indexes
 
 Key indexes for performance:
-- `contacts_org_id_idx` - Filter contacts by org
+- `contacts_tenant_id_idx` - Filter contacts by org
 - `contacts_status_idx` - Filter by pipeline stage
 - `tasks_due_date_idx` - Sort/filter by due date
 - `document_chunks_embedding_idx` - Vector similarity search

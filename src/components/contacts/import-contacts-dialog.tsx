@@ -28,10 +28,11 @@ interface ParsedData {
 
 // OrbitCRM field definitions
 const ORBITCRM_FIELDS = [
-  { value: 'name', label: 'Name', required: true },
+  { value: 'firstName', label: 'First Name', required: true },
+  { value: 'lastName', label: 'Last Name', required: false },
+  { value: 'companyName', label: 'Company Name', required: false },
   { value: 'email', label: 'Email', required: true },
   { value: 'phone', label: 'Phone', required: false },
-  { value: 'company', label: 'Company', required: false },
   { value: 'status', label: 'Status', required: false },
   { value: 'tags', label: 'Tags', required: false },
   { value: 'skip', label: '(Skip this column)', required: false },
@@ -46,14 +47,18 @@ function autoDetectMapping(headers: string[]): ColumnMapping {
   headers.forEach(header => {
     const lowerHeader = header.toLowerCase().trim()
 
-    if (lowerHeader.includes('name') || lowerHeader === 'full name' || lowerHeader === 'contact') {
-      mapping[header] = 'name'
+    if (lowerHeader === 'first name' || lowerHeader === 'given name' || lowerHeader === 'fname') {
+      mapping[header] = 'firstName'
+    } else if (lowerHeader === 'last name' || lowerHeader === 'family name' || lowerHeader === 'lname') {
+      mapping[header] = 'lastName'
+    } else if (lowerHeader === 'name' || lowerHeader === 'full name' || lowerHeader === 'contact') {
+      mapping[header] = 'firstName' // Default to first name if single name column
     } else if (lowerHeader.includes('email') || lowerHeader === 'e-mail') {
       mapping[header] = 'email'
     } else if (lowerHeader.includes('phone') || lowerHeader.includes('mobile') || lowerHeader.includes('tel')) {
       mapping[header] = 'phone'
     } else if (lowerHeader.includes('company') || lowerHeader.includes('organization') || lowerHeader.includes('org')) {
-      mapping[header] = 'company'
+      mapping[header] = 'companyName'
     } else if (lowerHeader.includes('status') || lowerHeader.includes('stage')) {
       mapping[header] = 'status'
     } else if (lowerHeader.includes('tag')) {
@@ -78,6 +83,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
     skipped: number
     duplicates: any[]
   } | null>(null)
+  const [validationErrors, setValidationErrors] = useState<{ row: number, errors: { field: string, message: string }[] }[]>([])
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0]
@@ -87,9 +93,9 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
 
     try {
       const fileType = file.name.endsWith('.csv') ? 'csv'
-                     : file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'xlsx'
-                     : file.name.endsWith('.vcf') ? 'vcf'
-                     : null
+        : file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'xlsx'
+          : file.name.endsWith('.vcf') ? 'vcf'
+            : null
 
       if (!fileType) {
         setError('Unsupported file type. Please upload CSV, Excel, or vCard files.')
@@ -173,14 +179,14 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
   // Validate column mapping
   const mappingValidation = useMemo(() => {
     const mappedFields = Object.values(columnMapping).filter(v => v !== 'skip')
-    const hasName = mappedFields.includes('name')
+    const hasFirstName = mappedFields.includes('firstName')
     const hasEmail = mappedFields.includes('email')
-    const isValid = hasName && hasEmail
+    const isValid = hasFirstName && hasEmail
 
     return {
       isValid,
       errors: [
-        ...(!hasName ? ['Name field is required'] : []),
+        ...(!hasFirstName ? ['First Name field is required'] : []),
         ...(!hasEmail ? ['Email field is required'] : []),
       ]
     }
@@ -208,6 +214,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
     setError(null)
     setProgress(0)
     setImportResult(null)
+    setValidationErrors([])
   }
 
   const handleImport = async () => {
@@ -240,7 +247,10 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
       const result = await response.json()
 
       if (!response.ok) {
-        throw new Error(result.error || 'Import failed')
+        const errorData = result
+        const error = new Error(result.error || 'Import failed') as any
+        error.details = result.details
+        throw error
       }
 
       setImportResult({
@@ -253,6 +263,9 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
     } catch (err: any) {
       console.error('Import error:', err)
       setError(err.message || 'Failed to import contacts')
+      if (err.details?.errors) {
+        setValidationErrors(err.details.errors)
+      }
       setStep('preview')
     }
   }
@@ -277,7 +290,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
           Import Contacts
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
         <DialogHeader>
           <DialogTitle>Import Contacts</DialogTitle>
           <DialogDescription>
@@ -286,10 +299,24 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
         </DialogHeader>
 
         {error && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          <div className="space-y-2">
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+            {validationErrors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-40 overflow-y-auto">
+                <p className="text-xs font-bold text-red-800 mb-1">Row-level Validation Failures:</p>
+                <ul className="space-y-1">
+                  {validationErrors.map((err, i) => (
+                    <li key={i} className="text-[11px] text-red-700">
+                      Row {err.row}: {err.errors.map(e => `${e.field}: ${e.message}`).join(', ')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Step 1: Upload */}
@@ -297,11 +324,10 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
           <div className="space-y-4">
             <div
               {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
+              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${isDragActive
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-gray-400'
+                }`}
             >
               <input {...getInputProps()} />
               <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
@@ -348,22 +374,26 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
 
         {/* Step 2: Column Mapping */}
         {step === 'mapping' && parsedData && (
-          <div className="space-y-4">
-            <div className="bg-gray-50 border rounded-lg p-4">
-              <p className="text-sm font-medium mb-2">File uploaded successfully:</p>
-              <p className="text-sm text-gray-600">{parsedData.fileName}</p>
-              <p className="text-sm text-gray-600">
-                {parsedData.rows.length} contacts found
-              </p>
+          <div className="space-y-4 w-full overflow-hidden">
+            <div className="bg-gray-50 border rounded-lg p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium mb-1">File uploaded successfully:</p>
+                <p className="text-sm text-gray-600 truncate max-w-[250px] sm:max-w-md">
+                  {parsedData.fileName} · {parsedData.rows.length} contacts found
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={handleReset} className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+                Change File
+              </Button>
             </div>
 
             <div>
               <h3 className="text-lg font-medium mb-2">Map Your Columns</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Match your file's columns to OrbitCRM fields. Required fields: Name and Email
+                Match your file's columns to OrbitCRM fields. Required fields: First Name and Email
               </p>
 
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto w-full">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -387,13 +417,15 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                             <SelectContent>
                               {ORBITCRM_FIELDS.map((field) => (
                                 <SelectItem key={field.value} value={field.value}>
-                                  {field.label} {field.required && <Badge variant="destructive" className="ml-1 text-xs">Required</Badge>}
+                                  <div className="flex items-center gap-2">
+                                    {field.label} {field.required && <Badge variant="destructive" className="ml-1 text-xs">Required</Badge>}
+                                  </div>
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                         </TableCell>
-                        <TableCell className="text-sm text-gray-600 truncate max-w-[200px]">
+                        <TableCell className="text-sm text-gray-500 italic max-w-0 truncate">
                           {parsedData.rows[0]?.[header] || '(empty)'}
                         </TableCell>
                       </TableRow>
@@ -435,32 +467,32 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
 
         {/* Step 3: Preview */}
         {step === 'preview' && parsedData && (
-          <div className="space-y-4">
+          <div className="space-y-4 w-full overflow-hidden">
             <div>
               <h3 className="text-lg font-medium mb-2">Preview Import</h3>
               <p className="text-sm text-gray-600 mb-4">
                 Showing first {Math.min(50, parsedData.rows.length)} of {parsedData.rows.length} contacts
               </p>
 
-              <div className="border rounded-lg overflow-auto max-h-96">
-                <Table>
+              <div className="border rounded-lg overflow-x-auto w-full">
+                <Table className="w-full" style={{ minWidth: '800px' }}>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Status</TableHead>
+                      {ORBITCRM_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
+                        <TableHead key={field.value} className="whitespace-nowrap font-semibold">
+                          {field.label}
+                        </TableHead>
+                      ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {previewData.map((row, i) => (
                       <TableRow key={i}>
-                        <TableCell className="font-medium">{row.name || '-'}</TableCell>
-                        <TableCell>{row.email || '-'}</TableCell>
-                        <TableCell>{row.phone || '-'}</TableCell>
-                        <TableCell>{row.company || '-'}</TableCell>
-                        <TableCell>{row.status || 'lead'}</TableCell>
+                        {ORBITCRM_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
+                          <TableCell key={`${i}-${field.value}`} className="whitespace-nowrap">
+                            {row[field.value] || '-'}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -468,14 +500,14 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
               </div>
             </div>
 
-            <div className="flex gap-2 justify-between">
-              <Button variant="outline" onClick={() => setStep('mapping')}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
+            <div className="flex items-center justify-between border-t pt-4">
+              <Button variant="outline" onClick={() => setStep('mapping')} className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
                 Back to Mapping
               </Button>
-              <Button onClick={handleImport}>
+              <Button onClick={handleImport} className="flex items-center gap-2">
                 Start Import ({parsedData.rows.length} contacts)
-                <ArrowRight className="h-4 w-4 ml-2" />
+                <ArrowRight className="h-4 w-4" />
               </Button>
             </div>
           </div>

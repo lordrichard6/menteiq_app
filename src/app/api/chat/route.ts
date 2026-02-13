@@ -48,11 +48,11 @@ export async function POST(req: Request) {
     }
 
     // Get User Role to determine RAG permissions
-    const { data: profile } = await supabase.from('profiles').select('org_id, role').eq('id', user.id).single();
-    const orgId = profile?.org_id;
+    const { data: profile } = await supabase.from('profiles').select('tenant_id, role').eq('id', user.id).single();
+    const tenantId = profile?.tenant_id;
     const role = profile?.role || 'member';
 
-    if (!orgId) {
+    if (!tenantId) {
         return new Response('No organization found', { status: 400 });
     }
 
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
                 }),
                 execute: async ({ query }: { query: string }) => {
                     // @ts-ignore
-                    const docs = await RagService.searchSimilarDocuments(query, orgId, visibilityFilter);
+                    const docs = await RagService.searchSimilarDocuments(query, tenantId, visibilityFilter);
                     return docs.length > 0 ? JSON.stringify(docs) : "No relevant documents found.";
                 }
             }
@@ -94,7 +94,7 @@ Be concise, professional, and helpful.`,
             if (usage && conversationId) {
                 try {
                     await supabase.from('token_usage').insert({
-                        org_id: orgId,
+                        tenant_id: tenantId,
                         user_id: user.id,
                         conversation_id: conversationId,
                         model: selectedModel,

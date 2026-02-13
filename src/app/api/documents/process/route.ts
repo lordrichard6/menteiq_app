@@ -44,11 +44,11 @@ export async function POST(request: NextRequest) {
     // Check if document belongs to user's organization
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single();
 
-    if (!profile || profile.org_id !== document.org_id) {
+    if (!profile || profile.tenant_id !== document.tenant_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
       // Log token usage for billing
       await supabase.from('token_usage').insert([
         {
-          org_id: document.org_id,
+          tenant_id: document.tenant_id,
           user_id: user.id,
           model: 'text-embedding-3-small',
           tokens_in: totalTokens,

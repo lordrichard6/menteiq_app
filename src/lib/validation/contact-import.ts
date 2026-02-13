@@ -1,18 +1,27 @@
 import { z } from 'zod'
 import { ContactStatus } from '@/types/contact'
+import { emailRegex, isValidPhone } from './contact'
 
-// Email validation regex (RFC 5322 simplified)
-const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Phone validation (international format, optional)
-const phoneRegex = /^[+]?[(]?[0-9]{1,4}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,9}$/
 
 // Import contact schema
 export const importContactSchema = z.object({
-  name: z.string()
-    .min(1, 'Name is required')
-    .max(200, 'Name must be less than 200 characters')
+  firstName: z.string()
+    .min(1, 'First Name is required')
+    .max(200, 'First Name must be less than 200 characters')
     .trim(),
+
+  lastName: z.string()
+    .max(200, 'Last Name must be less than 200 characters')
+    .optional()
+    .nullable()
+    .transform(val => val || ''),
+
+  companyName: z.string()
+    .max(200, 'Company name must be less than 200 characters')
+    .optional()
+    .nullable()
+    .transform(val => val || null),
 
   email: z.string()
     .min(1, 'Email is required')
@@ -23,16 +32,11 @@ export const importContactSchema = z.object({
 
   phone: z.string()
     .max(50, 'Phone must be less than 50 characters')
-    .regex(phoneRegex, 'Invalid phone format')
     .optional()
     .nullable()
-    .transform(val => val || null),
+    .transform(val => (val && val.trim() !== '') ? val.trim() : null)
+    .refine(val => val === null || isValidPhone(val), 'Invalid phone format'),
 
-  company: z.string()
-    .max(200, 'Company name must be less than 200 characters')
-    .optional()
-    .nullable()
-    .transform(val => val || null),
 
   status: z.enum(['lead', 'opportunity', 'client', 'churned'])
     .default('lead')
@@ -116,7 +120,7 @@ export function validateContacts(
 
 // Format validation errors for display
 export function formatValidationErrors(error: z.ZodError): string[] {
-  return error.errors.map(err => {
+  return error.issues.map(err => {
     const field = err.path.join('.')
     return `${field}: ${err.message}`
   })

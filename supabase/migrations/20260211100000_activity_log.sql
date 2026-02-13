@@ -5,8 +5,8 @@
 -- Create activity_log table
 CREATE TABLE IF NOT EXISTS public.activity_log (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
 
     -- Activity metadata
     event_type TEXT NOT NULL, -- 'created', 'updated', 'deleted', 'emailed', 'called', 'noted', etc.
@@ -31,11 +31,11 @@ CREATE TABLE IF NOT EXISTS public.activity_log (
 );
 
 -- Create indexes for efficient querying
-CREATE INDEX idx_activity_log_org_id ON public.activity_log(org_id);
+CREATE INDEX idx_activity_log_tenant_id ON public.activity_log(tenant_id);
 CREATE INDEX idx_activity_log_user_id ON public.activity_log(user_id);
 CREATE INDEX idx_activity_log_entity ON public.activity_log(entity_type, entity_id);
 CREATE INDEX idx_activity_log_created_at ON public.activity_log(created_at DESC);
-CREATE INDEX idx_activity_log_org_created ON public.activity_log(org_id, created_at DESC);
+CREATE INDEX idx_activity_log_tenant_created ON public.activity_log(tenant_id, created_at DESC);
 CREATE INDEX idx_activity_log_entity_created ON public.activity_log(entity_type, entity_id, created_at DESC);
 
 -- Composite index for contact timeline queries
@@ -50,8 +50,8 @@ ALTER TABLE public.activity_log ENABLE ROW LEVEL SECURITY;
 CREATE POLICY activity_log_select_policy ON public.activity_log
     FOR SELECT
     USING (
-        org_id IN (
-            SELECT org_id FROM public.profiles
+        tenant_id IN (
+            SELECT tenant_id FROM public.profiles
             WHERE id = auth.uid()
         )
     );
@@ -60,8 +60,8 @@ CREATE POLICY activity_log_select_policy ON public.activity_log
 CREATE POLICY activity_log_insert_policy ON public.activity_log
     FOR INSERT
     WITH CHECK (
-        org_id IN (
-            SELECT org_id FROM public.profiles
+        tenant_id IN (
+            SELECT tenant_id FROM public.profiles
             WHERE id = auth.uid()
         )
     );
@@ -81,7 +81,7 @@ COMMENT ON COLUMN public.activity_log.metadata IS 'Flexible JSONB storage for ch
 CREATE OR REPLACE VIEW public.activity_feed AS
 SELECT
     al.id,
-    al.org_id,
+    al.tenant_id,
     al.user_id,
     al.event_type,
     al.entity_type,
@@ -90,7 +90,7 @@ SELECT
     al.description,
     al.metadata,
     al.created_at,
-    p.first_name || ' ' || p.last_name AS user_name,
+    p.full_name AS user_name,
     p.avatar_url AS user_avatar
 FROM public.activity_log al
 LEFT JOIN public.profiles p ON al.user_id = p.id
@@ -110,28 +110,36 @@ CREATE OR REPLACE FUNCTION log_activity(
     p_entity_id UUID,
     p_entity_name TEXT DEFAULT NULL,
     p_description TEXT DEFAULT NULL,
-    p_metadata JSONB DEFAULT '{}'::jsonb
+    p_metadata JSONB DEFAULT '{}'::jsonb,
+    p_tenant_id UUID DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_org_id UUID;
+    v_tenant_id UUID;
     v_activity_id UUID;
 BEGIN
-    -- Get user's org_id
-    SELECT org_id INTO v_org_id
-    FROM public.profiles
-    WHERE id = auth.uid();
+    -- Use provided tenant_id or get from user's profile
+    v_tenant_id := p_tenant_id;
+    
+    IF v_tenant_id IS NULL AND auth.uid() IS NOT NULL THEN
+        SELECT tenant_id INTO v_tenant_id
+        FROM public.profiles
+        WHERE id = auth.uid();
+    END IF;
 
-    IF v_org_id IS NULL THEN
-        RAISE EXCEPTION 'User has no organization';
+    -- If still null (e.g. system seed or background process), skip or handle gracefully
+    IF v_tenant_id IS NULL THEN
+        -- During seeding or migrations, we might not have a session user.
+        -- We skip logging if we can't associate it with a tenant.
+        RETURN NULL;
     END IF;
 
     -- Insert activity log
     INSERT INTO public.activity_log (
-        org_id,
+        tenant_id,
         user_id,
         event_type,
         entity_type,
@@ -140,7 +148,7 @@ BEGIN
         description,
         metadata
     ) VALUES (
-        v_org_id,
+        v_tenant_id,
         auth.uid(),
         p_event_type,
         p_entity_type,
@@ -177,20 +185,20 @@ BEGIN
     -- Log based on operation
     IF TG_OP = 'INSERT' THEN
         v_description := 'Created contact: ' || v_entity_name;
-        PERFORM log_activity('created', 'contact', NEW.id, v_entity_name, v_description);
+        PERFORM log_activity('created', 'contact', NEW.id, v_entity_name, v_description, '{}'::jsonb, NEW.tenant_id);
     ELSIF TG_OP = 'UPDATE' THEN
         -- Only log if significant fields changed
         IF OLD.status IS DISTINCT FROM NEW.status THEN
             v_description := 'Changed status from ' || OLD.status || ' to ' || NEW.status;
             PERFORM log_activity('status_changed', 'contact', NEW.id, v_entity_name, v_description,
-                jsonb_build_object('old_status', OLD.status, 'new_status', NEW.status));
+                jsonb_build_object('old_status', OLD.status, 'new_status', NEW.status), NEW.tenant_id);
         ELSIF OLD.first_name IS DISTINCT FROM NEW.first_name OR OLD.last_name IS DISTINCT FROM NEW.last_name THEN
             v_description := 'Updated contact details';
-            PERFORM log_activity('updated', 'contact', NEW.id, v_entity_name, v_description);
+            PERFORM log_activity('updated', 'contact', NEW.id, v_entity_name, v_description, '{}'::jsonb, NEW.tenant_id);
         END IF;
     ELSIF TG_OP = 'DELETE' THEN
         v_description := 'Deleted contact: ' || v_entity_name;
-        PERFORM log_activity('deleted', 'contact', OLD.id, v_entity_name, v_description);
+        PERFORM log_activity('deleted', 'contact', OLD.id, v_entity_name, v_description, '{}'::jsonb, OLD.tenant_id);
         RETURN OLD;
     END IF;
 

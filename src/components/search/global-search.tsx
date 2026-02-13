@@ -50,11 +50,11 @@ export function GlobalSearch() {
 
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('org_id')
+                .select('tenant_id')
                 .eq('id', user.id)
                 .single()
 
-            if (!profile?.org_id) return
+            if (!profile?.tenant_id) return
 
             const searchResults: SearchResult[] = []
 
@@ -62,7 +62,7 @@ export function GlobalSearch() {
             const { data: contacts } = await supabase
                 .from('contacts')
                 .select('id, first_name, last_name, company_name, email, is_company')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
                 .or(`first_name.ilike.%${searchQuery}%,last_name.ilike.%${searchQuery}%,company_name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`)
                 .limit(5)
 
@@ -74,7 +74,7 @@ export function GlobalSearch() {
                         title: contact.is_company
                             ? contact.company_name || 'Unnamed Company'
                             : `${contact.first_name || ''} ${contact.last_name || ''}`.trim() ||
-                              'Unnamed Contact',
+                            'Unnamed Contact',
                         subtitle: contact.email || undefined,
                         url: `/contacts/${contact.id}`,
                     }))
@@ -85,7 +85,7 @@ export function GlobalSearch() {
             const { data: projects } = await supabase
                 .from('projects')
                 .select('id, name, description')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
                 .or(`name.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
                 .limit(5)
 
@@ -105,7 +105,7 @@ export function GlobalSearch() {
             const { data: tasks } = await supabase
                 .from('tasks')
                 .select('id, title, description')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
                 .or(`title.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
                 .limit(5)
 
@@ -125,7 +125,7 @@ export function GlobalSearch() {
             const { data: invoices } = await supabase
                 .from('invoices')
                 .select('id, invoice_number, description')
-                .eq('org_id', profile.org_id)
+                .eq('tenant_id', profile.tenant_id)
                 .or(`invoice_number.ilike.%${searchQuery}%,description.ilike.%${searchQuery}%`)
                 .limit(5)
 

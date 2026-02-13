@@ -9,13 +9,13 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import type { 
-  Invoice, 
-  InvoiceInsert, 
-  InvoiceLineItem, 
+import type {
+  Invoice,
+  InvoiceInsert,
+  InvoiceLineItem,
   InvoiceLineItemInsert,
   InvoiceType,
-  InvoiceStatus 
+  InvoiceStatus
 } from '@/lib/types/schema';
 
 // =====================================================
@@ -111,18 +111,18 @@ export const InvoiceService = {
   async generateInvoiceNumber(tenantId: string): Promise<string> {
     const supabase = await createClient();
     const year = new Date().getFullYear();
-    
+
     // Get organization settings for prefix
     const { data: org } = await supabase
       .from('organizations')
       .select('settings')
       .eq('id', tenantId)
       .single();
-    
+
     const settings = (org?.settings as Record<string, unknown>) || {};
     const billing = (settings.billing as Record<string, unknown>) || {};
     const prefix = (billing.invoice_prefix as string) || 'INV';
-    
+
     // Count existing invoices this year for this tenant
     const startOfYear = `${year}-01-01`;
     const { count } = await supabase
@@ -130,10 +130,10 @@ export const InvoiceService = {
       .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
       .gte('created_at', startOfYear);
-    
+
     const nextNumber = (count || 0) + 1;
     const paddedNumber = nextNumber.toString().padStart(4, '0');
-    
+
     return `${prefix}-${year}-${paddedNumber}`;
   },
 
@@ -143,10 +143,10 @@ export const InvoiceService = {
    */
   generateQRReference(): string {
     // Generate a random 21-digit number
-    const randomDigits = Array.from({ length: 21 }, () => 
+    const randomDigits = Array.from({ length: 21 }, () =>
       Math.floor(Math.random() * 10)
     ).join('');
-    
+
     // Format with spaces for readability
     return randomDigits.replace(/(.{5})/g, '$1 ').trim();
   },
@@ -159,27 +159,27 @@ export const InvoiceService = {
     input: CreateInvoiceInput
   ): Promise<InvoiceWithLineItems> {
     const supabase = await createClient();
-    
+
     // Calculate totals
     const totals = calculateTotals(input.line_items);
-    
+
     // Generate invoice number
     const invoiceNumber = await this.generateInvoiceNumber(tenantId);
-    
+
     // Get organization IBAN for the invoice
     const { data: org } = await supabase
       .from('organizations')
       .select('settings')
       .eq('id', tenantId)
       .single();
-    
+
     const settings = (org?.settings as Record<string, unknown>) || {};
     const billing = (settings.billing as Record<string, unknown>) || {};
     const iban = (billing.iban as string) || null;
-    
+
     // Create invoice record
     const invoiceData: InvoiceInsert = {
-      org_id: tenantId,
+      tenant_id: tenantId,
       contact_id: input.contact_id,
       project_id: input.project_id || null,
       invoice_number: invoiceNumber,
@@ -198,17 +198,17 @@ export const InvoiceService = {
       stripe_payment_link: null,
       stripe_payment_id: null,
     };
-    
+
     const { data: invoice, error: invoiceError } = await supabase
       .from('invoices')
       .insert(invoiceData)
       .select()
       .single();
-    
+
     if (invoiceError || !invoice) {
       throw new Error(`Failed to create invoice: ${invoiceError?.message}`);
     }
-    
+
     // Create line items
     const lineItemsData: InvoiceLineItemInsert[] = input.line_items.map((item, index) => ({
       invoice_id: invoice.id,
@@ -218,18 +218,18 @@ export const InvoiceService = {
       tax_rate: item.tax_rate,
       sort_order: item.sort_order ?? index,
     }));
-    
+
     const { data: lineItems, error: lineItemsError } = await supabase
       .from('invoice_line_items')
       .insert(lineItemsData)
       .select();
-    
+
     if (lineItemsError) {
       // Rollback: delete the invoice if line items fail
       await supabase.from('invoices').delete().eq('id', invoice.id);
       throw new Error(`Failed to create line items: ${lineItemsError.message}`);
     }
-    
+
     return {
       ...invoice,
       line_items: lineItems || [],
@@ -241,7 +241,7 @@ export const InvoiceService = {
    */
   async getInvoice(invoiceId: string): Promise<InvoiceWithLineItems | null> {
     const supabase = await createClient();
-    
+
     const { data: invoice, error } = await supabase
       .from('invoices')
       .select(`
@@ -261,18 +261,18 @@ export const InvoiceService = {
       `)
       .eq('id', invoiceId)
       .single();
-    
+
     if (error || !invoice) {
       return null;
     }
-    
+
     // Get line items
     const { data: lineItems } = await supabase
       .from('invoice_line_items')
       .select('*')
       .eq('invoice_id', invoiceId)
       .order('sort_order', { ascending: true });
-    
+
     return {
       ...invoice,
       contact: invoice.contacts as InvoiceWithLineItems['contact'],
@@ -285,7 +285,7 @@ export const InvoiceService = {
    */
   async listInvoices(tenantId: string): Promise<InvoiceWithLineItems[]> {
     const supabase = await createClient();
-    
+
     const { data: invoices, error } = await supabase
       .from('invoices')
       .select(`
@@ -301,11 +301,11 @@ export const InvoiceService = {
       `)
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
-    
+
     if (error || !invoices) {
       return [];
     }
-    
+
     // Get line items for all invoices
     const invoiceIds = invoices.map(i => i.id);
     const { data: allLineItems } = await supabase
@@ -313,7 +313,7 @@ export const InvoiceService = {
       .select('*')
       .in('invoice_id', invoiceIds)
       .order('sort_order', { ascending: true });
-    
+
     // Group line items by invoice
     const lineItemsByInvoice = new Map<string, InvoiceLineItem[]>();
     for (const item of allLineItems || []) {
@@ -321,7 +321,7 @@ export const InvoiceService = {
       existing.push(item);
       lineItemsByInvoice.set(item.invoice_id, existing);
     }
-    
+
     return invoices.map(invoice => ({
       ...invoice,
       contact: invoice.contacts as InvoiceWithLineItems['contact'],
@@ -337,10 +337,10 @@ export const InvoiceService = {
     input: UpdateInvoiceInput
   ): Promise<InvoiceWithLineItems> {
     const supabase = await createClient();
-    
+
     // Build update object
     const updateData: Partial<InvoiceInsert> = {};
-    
+
     if (input.contact_id !== undefined) updateData.contact_id = input.contact_id;
     if (input.project_id !== undefined) updateData.project_id = input.project_id;
     if (input.currency !== undefined) updateData.currency = input.currency;
@@ -348,20 +348,20 @@ export const InvoiceService = {
     if (input.status !== undefined) updateData.status = input.status;
     if (input.due_date !== undefined) updateData.due_date = input.due_date;
     if (input.notes !== undefined) updateData.notes = input.notes;
-    
+
     // If line items are provided, recalculate totals
     if (input.line_items) {
       const totals = calculateTotals(input.line_items);
       updateData.subtotal = totals.subtotal;
       updateData.tax_total = totals.tax_total;
       updateData.amount_total = totals.amount_total;
-      
+
       // Delete existing line items
       await supabase
         .from('invoice_line_items')
         .delete()
         .eq('invoice_id', invoiceId);
-      
+
       // Insert new line items
       const lineItemsData: InvoiceLineItemInsert[] = input.line_items.map((item, index) => ({
         invoice_id: invoiceId,
@@ -371,30 +371,30 @@ export const InvoiceService = {
         tax_rate: item.tax_rate,
         sort_order: item.sort_order ?? index,
       }));
-      
+
       await supabase
         .from('invoice_line_items')
         .insert(lineItemsData);
     }
-    
+
     // Update invoice
     if (Object.keys(updateData).length > 0) {
       const { error } = await supabase
         .from('invoices')
         .update(updateData)
         .eq('id', invoiceId);
-      
+
       if (error) {
         throw new Error(`Failed to update invoice: ${error.message}`);
       }
     }
-    
+
     // Return updated invoice
     const result = await this.getInvoice(invoiceId);
     if (!result) {
       throw new Error('Invoice not found after update');
     }
-    
+
     return result;
   },
 
@@ -403,7 +403,7 @@ export const InvoiceService = {
    */
   async markAsPaid(invoiceId: string, stripePaymentId?: string): Promise<Invoice> {
     const supabase = await createClient();
-    
+
     const { data, error } = await supabase
       .from('invoices')
       .update({
@@ -414,11 +414,11 @@ export const InvoiceService = {
       .eq('id', invoiceId)
       .select()
       .single();
-    
+
     if (error || !data) {
       throw new Error(`Failed to mark invoice as paid: ${error?.message}`);
     }
-    
+
     return data;
   },
 
@@ -427,18 +427,18 @@ export const InvoiceService = {
    */
   async markAsSent(invoiceId: string): Promise<Invoice> {
     const supabase = await createClient();
-    
+
     const { data, error } = await supabase
       .from('invoices')
       .update({ status: 'sent' })
       .eq('id', invoiceId)
       .select()
       .single();
-    
+
     if (error || !data) {
       throw new Error(`Failed to mark invoice as sent: ${error?.message}`);
     }
-    
+
     return data;
   },
 
@@ -447,18 +447,18 @@ export const InvoiceService = {
    */
   async setPaymentLink(invoiceId: string, paymentLink: string): Promise<Invoice> {
     const supabase = await createClient();
-    
+
     const { data, error } = await supabase
       .from('invoices')
       .update({ stripe_payment_link: paymentLink })
       .eq('id', invoiceId)
       .select()
       .single();
-    
+
     if (error || !data) {
       throw new Error(`Failed to set payment link: ${error?.message}`);
     }
-    
+
     return data;
   },
 
@@ -467,12 +467,12 @@ export const InvoiceService = {
    */
   async deleteInvoice(invoiceId: string): Promise<void> {
     const supabase = await createClient();
-    
+
     const { error } = await supabase
       .from('invoices')
       .delete()
       .eq('id', invoiceId);
-    
+
     if (error) {
       throw new Error(`Failed to delete invoice: ${error.message}`);
     }

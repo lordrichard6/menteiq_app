@@ -28,7 +28,7 @@ export async function GET(req: Request) {
             return NextResponse.json({ error: 'Profile not found' }, { status: 404 })
         }
 
-        const orgId = profile.org_id
+        const tenantId = profile.tenant_id
 
         // Collect all user data
         const exportData: any = {
@@ -55,11 +55,11 @@ export async function GET(req: Request) {
         }
 
         // Get organization data
-        if (orgId) {
+        if (tenantId) {
             const { data: org } = await supabase
                 .from('organizations')
                 .select('*')
-                .eq('id', orgId)
+                .eq('id', tenantId)
                 .single()
 
             if (org) {
@@ -74,7 +74,7 @@ export async function GET(req: Request) {
             const { data: contacts } = await supabase
                 .from('contacts')
                 .select('*')
-                .eq('org_id', orgId)
+                .eq('tenant_id', tenantId)
 
             exportData.contacts = contacts || []
 
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
             const { data: projects } = await supabase
                 .from('projects')
                 .select('*')
-                .eq('org_id', orgId)
+                .eq('tenant_id', tenantId)
 
             exportData.projects = projects || []
 
@@ -90,7 +90,7 @@ export async function GET(req: Request) {
             const { data: tasks } = await supabase
                 .from('tasks')
                 .select('*')
-                .eq('org_id', orgId)
+                .eq('tenant_id', tenantId)
 
             exportData.tasks = tasks || []
 
@@ -98,7 +98,7 @@ export async function GET(req: Request) {
             const { data: invoices } = await supabase
                 .from('invoices')
                 .select('*')
-                .eq('org_id', orgId)
+                .eq('tenant_id', tenantId)
 
             exportData.invoices = invoices || []
 

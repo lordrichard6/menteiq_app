@@ -9,11 +9,12 @@ import { useContactStore } from '@/stores/contact-store'
 
 interface KanbanBoardProps {
     contacts: Contact[]
+    onDeleteContact: (id: string) => void
 }
 
 const COLUMNS: ContactStatus[] = ['lead', 'opportunity', 'client', 'churned']
 
-export function KanbanBoard({ contacts }: KanbanBoardProps) {
+export function KanbanBoard({ contacts, onDeleteContact }: KanbanBoardProps) {
     const updateStatus = useContactStore(state => state.updateStatus)
     const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -66,13 +67,18 @@ export function KanbanBoard({ contacts }: KanbanBoardProps) {
         >
             <div className="flex h-[calc(100vh-220px)] gap-4 overflow-x-auto pb-4">
                 {COLUMNS.map((colId) => (
-                    <KanbanColumn key={colId} id={colId} contacts={contacts} />
+                    <KanbanColumn
+                        key={colId}
+                        id={colId}
+                        contacts={contacts}
+                        onDeleteContact={onDeleteContact}
+                    />
                 ))}
             </div>
 
             <DragOverlay>
                 {activeContact ? (
-                    <KanbanCard contact={activeContact} />
+                    <KanbanCard contact={activeContact} onDelete={() => { }} />
                 ) : null}
             </DragOverlay>
         </DndContext>

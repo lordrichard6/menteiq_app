@@ -19,11 +19,11 @@ export async function POST(request: NextRequest) {
     // Get user's organization
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single()
 
-    if (profileError || !profile?.org_id) {
+    if (profileError || !profile?.tenant_id) {
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     const { data: existingContacts } = await supabase
       .from('contacts')
       .select('email')
-      .eq('org_id', profile.org_id)
+      .eq('tenant_id', profile.tenant_id)
 
     const existingEmails = new Set(
       (existingContacts || []).map(c => c.email?.toLowerCase()).filter(Boolean)
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
           duplicates: validationResult.duplicates.length,
           errors: validationResult.invalid.map(inv => ({
             row: inv.row,
-            errors: inv.errors.errors.map(err => ({
+            errors: inv.errors.issues.map(err => ({
               field: err.path.join('.'),
               message: err.message
             }))
@@ -87,19 +87,14 @@ export async function POST(request: NextRequest) {
 
     // Prepare contacts for insertion
     const contactsToInsert = validationResult.valid.map((contact: ImportContactInput) => {
-      // Parse name into first_name and last_name
-      const nameParts = contact.name.trim().split(' ')
-      const firstName = nameParts[0] || ''
-      const lastName = nameParts.slice(1).join(' ') || ''
-
       return {
-        org_id: profile.org_id,
-        first_name: firstName,
-        last_name: lastName,
+        tenant_id: profile.tenant_id,
+        first_name: contact.firstName,
+        last_name: contact.lastName,
         email: contact.email,
         phone: contact.phone,
-        company_name: contact.company,
-        is_company: false,
+        company_name: contact.companyName,
+        is_company: !contact.firstName && !!contact.companyName,
         status: contact.status,
         tags: contact.tags || [],
         notes: null,
@@ -165,11 +160,11 @@ export async function GET(request: NextRequest) {
     // Get user's organization
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single()
 
-    if (!profile?.org_id) {
+    if (!profile?.tenant_id) {
       return NextResponse.json(
         { error: 'Organization not found' },
         { status: 404 }
@@ -190,7 +185,7 @@ export async function GET(request: NextRequest) {
     const { data: existingContacts } = await supabase
       .from('contacts')
       .select('id, email, first_name, last_name')
-      .eq('org_id', profile.org_id)
+      .eq('tenant_id', profile.tenant_id)
       .in('email', emails)
 
     return NextResponse.json({

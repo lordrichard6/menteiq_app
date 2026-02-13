@@ -5,8 +5,8 @@
 -- Create notifications table
 CREATE TABLE IF NOT EXISTS public.notifications (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
 
     -- Notification content
     type TEXT NOT NULL, -- 'task_due', 'invoice_overdue', 'mention', 'reminder', 'system', etc.
@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.notifications (
 
 -- Create indexes for efficient querying
 CREATE INDEX idx_notifications_user_id ON public.notifications(user_id);
-CREATE INDEX idx_notifications_org_id ON public.notifications(org_id);
+CREATE INDEX idx_notifications_tenant_id ON public.notifications(tenant_id);
 CREATE INDEX idx_notifications_read ON public.notifications(user_id, read, created_at DESC);
 CREATE INDEX idx_notifications_created_at ON public.notifications(created_at DESC);
 
@@ -65,11 +65,46 @@ CREATE POLICY notifications_update_policy ON public.notifications
 CREATE POLICY notifications_insert_policy ON public.notifications
     FOR INSERT
     WITH CHECK (
-        org_id IN (
-            SELECT org_id FROM public.profiles
+        tenant_id IN (
+            SELECT tenant_id FROM public.profiles
             WHERE id = auth.uid()
         )
     );
+
+-- =====================================================
+-- NEW: NOTIFICATION PREFERENCES
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS public.notification_preferences (
+  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL UNIQUE,
+
+  -- In-app notification preferences
+  enable_in_app boolean DEFAULT true,
+
+  -- Email notification preferences
+  enable_email boolean DEFAULT true,
+  email_frequency text DEFAULT 'instant', -- 'instant', 'daily', 'weekly', 'never'
+
+  -- Specific notification types
+  notify_invoice_overdue boolean DEFAULT true,
+  notify_task_due boolean DEFAULT true,
+  notify_task_overdue boolean DEFAULT true,
+  notify_follow_up boolean DEFAULT true,
+
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- Enable RLS
+ALTER TABLE public.notification_preferences ENABLE ROW LEVEL SECURITY;
+
+-- Users can view/update their own preferences
+CREATE POLICY "Users view their own preferences" ON public.notification_preferences
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Users update their own preferences" ON public.notification_preferences
+  FOR ALL USING (user_id = auth.uid());
 
 -- Add comments for documentation
 COMMENT ON TABLE public.notifications IS 'In-app notifications for users';
@@ -99,21 +134,22 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
-    v_org_id UUID;
+    v_tenant_id UUID;
     v_notification_id UUID;
 BEGIN
-    -- Get user's org_id
-    SELECT org_id INTO v_org_id
+    -- Get user's tenant_id
+    SELECT tenant_id INTO v_tenant_id
     FROM public.profiles
     WHERE id = p_user_id;
 
-    IF v_org_id IS NULL THEN
-        RAISE EXCEPTION 'User has no organization';
+    -- If still null (e.g. seeding), skip notification
+    IF v_tenant_id IS NULL THEN
+        RETURN NULL;
     END IF;
 
     -- Insert notification
     INSERT INTO public.notifications (
-        org_id,
+        tenant_id,
         user_id,
         type,
         title,
@@ -123,7 +159,7 @@ BEGIN
         entity_url,
         metadata
     ) VALUES (
-        v_org_id,
+        v_tenant_id,
         p_user_id,
         p_type,
         p_title,
@@ -154,7 +190,7 @@ DECLARE
 BEGIN
     -- Find overdue unpaid invoices
     FOR v_invoice IN
-        SELECT i.id, i.invoice_number, i.due_date, i.org_id, i.contact_id
+        SELECT i.id, i.invoice_number, i.due_date, i.tenant_id, i.contact_id
         FROM public.invoices i
         WHERE i.status = 'sent'
         AND i.due_date < CURRENT_DATE
@@ -169,7 +205,7 @@ BEGIN
         -- Get the organization owner
         SELECT id INTO v_user_id
         FROM public.profiles
-        WHERE org_id = v_invoice.org_id
+        WHERE tenant_id = v_invoice.tenant_id
         AND role = 'owner'
         LIMIT 1;
 
@@ -194,7 +230,24 @@ $$;
 
 COMMENT ON FUNCTION check_overdue_invoices IS 'Check for overdue invoices and create notifications (run daily)';
 
+-- Trigger to create default preferences for new users
+CREATE OR REPLACE FUNCTION create_default_notification_preferences()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.notification_preferences (user_id)
+  VALUES (NEW.id)
+  ON CONFLICT (user_id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_user_created_notification_preferences
+  AFTER INSERT ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION create_default_notification_preferences();
+
 -- Grant access to authenticated users
 GRANT SELECT ON public.notifications TO authenticated;
 GRANT UPDATE ON public.notifications TO authenticated;
 GRANT INSERT ON public.notifications TO authenticated;
+GRANT SELECT ON public.notification_preferences TO authenticated;
+GRANT ALL ON public.notification_preferences TO authenticated;

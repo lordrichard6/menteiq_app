@@ -79,11 +79,11 @@ export async function GET(req: Request) {
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('org_id')
+            .select('tenant_id')
             .eq('id', user.id)
             .single()
 
-        if (!profile?.org_id) {
+        if (!profile?.tenant_id) {
             return NextResponse.json({ error: 'No organization found' }, { status: 400 })
         }
 
@@ -91,7 +91,7 @@ export async function GET(req: Request) {
         const { data: contacts, error } = await supabase
             .from('contacts')
             .select('id, first_name, last_name, email, phone, company_name, is_company, created_at')
-            .eq('org_id', profile.org_id)
+            .eq('tenant_id', profile.tenant_id)
             .order('created_at', { ascending: false })
 
         if (error) throw error
@@ -266,22 +266,22 @@ export async function POST(req: Request) {
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('org_id')
+            .select('tenant_id')
             .eq('id', user.id)
             .single()
 
-        if (!profile?.org_id) {
+        if (!profile?.tenant_id) {
             return NextResponse.json({ error: 'No organization found' }, { status: 400 })
         }
 
         // Verify all contacts belong to the user's org
         const { data: primaryContact } = await supabase
             .from('contacts')
-            .select('org_id')
+            .select('tenant_id')
             .eq('id', primaryId)
             .single()
 
-        if (!primaryContact || primaryContact.org_id !== profile.org_id) {
+        if (!primaryContact || primaryContact.tenant_id !== profile.tenant_id) {
             return NextResponse.json({ error: 'Primary contact not found' }, { status: 404 })
         }
 
@@ -300,7 +300,7 @@ export async function POST(req: Request) {
             .from('contacts')
             .delete()
             .in('id', duplicateIds)
-            .eq('org_id', profile.org_id)
+            .eq('tenant_id', profile.tenant_id)
 
         if (deleteError) throw deleteError
 

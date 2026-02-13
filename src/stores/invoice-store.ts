@@ -1,10 +1,10 @@
 import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
-import type { 
-    Invoice, 
-    InvoiceLineItem, 
-    InvoiceStatus, 
-    InvoiceType 
+import type {
+    Invoice,
+    InvoiceLineItem,
+    InvoiceStatus,
+    InvoiceType
 } from '@/lib/types/schema'
 
 // =====================================================
@@ -45,9 +45,9 @@ interface InvoiceStore {
     invoices: InvoiceWithLineItems[]
     isLoading: boolean
     error: string | null
-    
+
     // Actions
-    fetchInvoices: () => Promise<void>
+    fetchInvoices: (projectId?: string) => Promise<void>
     addInvoice: (input: CreateInvoiceInput) => Promise<InvoiceWithLineItems | null>
     updateInvoice: (id: string, updates: Partial<Invoice>, lineItems?: LineItemInput[]) => Promise<void>
     deleteInvoice: (id: string) => Promise<void>
@@ -85,27 +85,27 @@ function calculateTotals(lineItems: LineItemInput[]): {
 
 function generateQRReference(): string {
     // Generate a random 21-digit number for QR reference
-    const randomDigits = Array.from({ length: 21 }, () => 
+    const randomDigits = Array.from({ length: 21 }, () =>
         Math.floor(Math.random() * 10)
     ).join('')
-    
+
     return randomDigits.replace(/(.{5})/g, '$1 ').trim()
 }
 
 async function generateInvoiceNumber(supabase: any, tenantId: string): Promise<string> {
     const year = new Date().getFullYear()
-    
+
     // Get organization settings for prefix
     const { data: org } = await supabase
         .from('organizations')
         .select('settings')
         .eq('id', tenantId)
         .single()
-    
+
     const settings = (org?.settings as Record<string, unknown>) || {}
     const billing = (settings.billing as Record<string, unknown>) || {}
     const prefix = (billing.invoice_prefix as string) || 'INV'
-    
+
     // Count existing invoices this year for this tenant
     const startOfYear = `${year}-01-01`
     const { count } = await supabase
@@ -113,10 +113,10 @@ async function generateInvoiceNumber(supabase: any, tenantId: string): Promise<s
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .gte('created_at', startOfYear)
-    
+
     const nextNumber = (count || 0) + 1
     const paddedNumber = nextNumber.toString().padStart(4, '0')
-    
+
     return `${prefix}-${year}-${paddedNumber}`
 }
 
@@ -129,13 +129,13 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
     isLoading: false,
     error: null,
 
-    fetchInvoices: async () => {
+    fetchInvoices: async (projectId) => {
         set({ isLoading: true, error: null })
         try {
             const supabase = createClient()
-            
+
             // Fetch invoices with contacts
-            const { data: invoices, error } = await supabase
+            let query = supabase
                 .from('invoices')
                 .select(`
                     *,
@@ -148,7 +148,12 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
                         email
                     )
                 `)
-                .order('created_at', { ascending: false })
+
+            if (projectId) {
+                query = query.eq('project_id', projectId)
+            }
+
+            const { data: invoices, error } = await query.order('created_at', { ascending: false })
 
             if (error) throw error
 
@@ -186,36 +191,36 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            
+
             // Get current user's tenant_id and IBAN
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Not authenticated')
-            
+
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('tenant_id')
                 .eq('id', user.id)
                 .single()
-            
+
             if (!profile?.tenant_id) throw new Error('No organization found')
-            
+
             // Get organization settings for IBAN
             const { data: org } = await supabase
                 .from('organizations')
                 .select('settings')
                 .eq('id', profile.tenant_id)
                 .single()
-            
+
             const settings = (org?.settings as Record<string, unknown>) || {}
             const billing = (settings.billing as Record<string, unknown>) || {}
             const iban = (billing.iban as string) || null
-            
+
             // Calculate totals
             const totals = calculateTotals(input.line_items)
-            
+
             // Generate invoice number
             const invoiceNumber = await generateInvoiceNumber(supabase, profile.tenant_id)
-            
+
             // Create invoice record
             const invoiceData = {
                 tenant_id: profile.tenant_id,
@@ -293,10 +298,10 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            
+
             // Build update object
             const dbUpdates: any = {}
-            
+
             if (updates.contact_id !== undefined) dbUpdates.contact_id = updates.contact_id
             if (updates.project_id !== undefined) dbUpdates.project_id = updates.project_id
             if (updates.currency !== undefined) dbUpdates.currency = updates.currency

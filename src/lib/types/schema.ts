@@ -44,7 +44,7 @@ export type Tenant = Organization;
 
 export type Profile = {
   id: string;
-  org_id: string | null;
+  tenant_id: string | null;
   role: UserRole;
   full_name: string | null;
   email: string | null;
@@ -55,7 +55,7 @@ export type Profile = {
 
 export type Contact = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   is_company: boolean;
   company_uid: string | null;
   company_name: string | null;
@@ -77,7 +77,7 @@ export type Contact = {
 
 export type Project = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   contact_id: string | null;
   name: string;
   description: string | null;
@@ -95,7 +95,7 @@ export type InvoiceType = 'swiss_qr' | 'eu_sepa';
 
 export type Invoice = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   project_id: string | null;
   contact_id: string | null;
   invoice_number: string;
@@ -131,7 +131,7 @@ export type InvoiceLineItem = {
 
 export type Task = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   contact_id: string | null;
   project_id: string | null;
   title: string;
@@ -146,7 +146,7 @@ export type Task = {
 
 export type Document = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   project_id: string | null;
   contact_id: string | null;
   name: string;
@@ -170,7 +170,7 @@ export type DocumentChunk = {
 
 export type Booking = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   project_id: string | null;
   contact_id: string | null;
   external_event_id: string | null;
@@ -188,7 +188,7 @@ export type Booking = {
 
 export type AIConversation = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   user_id: string;
   contact_id: string | null;
   project_id: string | null;
@@ -214,7 +214,7 @@ export type AIMessage = {
 
 export type UsageLog = {
   id: string;
-  org_id: string;
+  tenant_id: string;
   user_id: string;
   model: string;
   tokens_in: number;

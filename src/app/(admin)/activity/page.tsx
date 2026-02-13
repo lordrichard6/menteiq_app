@@ -31,7 +31,7 @@ import Link from 'next/link'
 
 interface ActivityEntry {
     id: string
-    org_id: string
+    tenant_id: string
     user_id: string
     event_type: EventType
     entity_type: string

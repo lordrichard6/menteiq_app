@@ -64,11 +64,11 @@ export async function logActivity({
 
         const { data: profile } = await supabase
             .from('profiles')
-            .select('org_id')
+            .select('tenant_id')
             .eq('id', user.id)
             .single()
 
-        if (!profile?.org_id) {
+        if (!profile?.tenant_id) {
             return { success: false, error: 'No organization found' }
         }
 
@@ -76,7 +76,7 @@ export async function logActivity({
         const { error } = await supabase
             .from('activity_log')
             .insert({
-                org_id: profile.org_id,
+                tenant_id: profile.tenant_id,
                 user_id: user.id,
                 event_type: eventType,
                 entity_type: entityType,
@@ -293,16 +293,16 @@ export async function getOrganizationActivity(limit = 50) {
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('org_id')
+        .select('tenant_id')
         .eq('id', user.id)
         .single()
 
-    if (!profile?.org_id) return []
+    if (!profile?.tenant_id) return []
 
     const { data, error } = await supabase
         .from('activity_feed')
         .select('*')
-        .eq('org_id', profile.org_id)
+        .eq('tenant_id', profile.tenant_id)
         .order('created_at', { ascending: false })
         .limit(limit)
 

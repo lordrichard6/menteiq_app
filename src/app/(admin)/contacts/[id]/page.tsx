@@ -1,6 +1,7 @@
 'use client'
 
 import { useContactStore } from '@/stores/contact-store'
+import { Contact, ContactStatus, STATUS_LABELS, STATUS_COLORS } from '@/types/contact'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
@@ -11,7 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
-import { STATUS_LABELS, STATUS_COLORS, ContactStatus } from '@/types/contact'
 import { TagsInput } from '@/components/contacts/tags-input'
 import { NotesSection } from '@/components/contacts/notes-section'
 import { EditContactDialog } from '@/components/contacts/edit-contact-dialog'
@@ -40,23 +40,36 @@ export default function ContactDetailPage() {
     const updateStatus = useContactStore((state) => state.updateStatus)
     const deleteContact = useContactStore((state) => state.deleteContact)
     const fetchContacts = useContactStore((state) => state.fetchContacts)
-    const isLoading = useContactStore((state) => state.isLoading)
+    const fetchContactById = useContactStore((state) => state.fetchContactById)
+    const isLoadingStore = useContactStore((state) => state.isLoading)
 
+    const [contact, setContact] = useState<Contact | null>(null)
+    const [isInternalLoading, setIsInternalLoading] = useState(false)
     const [showEditDialog, setShowEditDialog] = useState(false)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [gdprDelete, setGdprDelete] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
-    // Fetch contacts on mount if needed
     useEffect(() => {
-        if (contacts.length === 0) {
-            fetchContacts()
+        const loadContact = async () => {
+            // First try to find in store
+            const found = contacts.find(c => c.id === contactId)
+            if (found) {
+                setContact(found)
+            } else {
+                // Not in store (maybe not on current page), fetch individually
+                setIsInternalLoading(true)
+                const fetched = await fetchContactById(contactId)
+                setContact(fetched)
+                setIsInternalLoading(false)
+            }
         }
-    }, [contacts.length, fetchContacts])
 
-    // Find contact from the reactive contacts array
-    const contact = contacts.find(c => c.id === contactId)
+        loadContact()
+    }, [contactId, contacts, fetchContactById])
+
+    const isLoading = isLoadingStore || isInternalLoading
 
     const handleDelete = async () => {
         setIsDeleting(true)
@@ -116,12 +129,13 @@ export default function ContactDetailPage() {
     }
 
     // Generate avatar initials
-    const initials = contact.name
-        .split(' ')
+    const displayName = contact.isCompany ? (contact.companyName || 'C') : `${contact.firstName} ${contact.lastName}`
+    const initials = (contact.isCompany ? contact.companyName : `${contact.firstName} ${contact.lastName}`)
+        ?.split(' ')
         .map(n => n[0])
         .join('')
         .toUpperCase()
-        .slice(0, 2)
+        .slice(0, 2) || '?'
 
     return (
         <div className="space-y-6 max-w-6xl">
@@ -145,7 +159,9 @@ export default function ContactDetailPage() {
 
                             {/* Contact Info */}
                             <div className="space-y-2">
-                                <h1 className="text-3xl font-bold text-[#3D4A67]">{contact.name}</h1>
+                                <h1 className="text-3xl font-bold text-[#3D4A67]">
+                                    {contact.isCompany ? contact.companyName : `${contact.firstName} ${contact.lastName}`}
+                                </h1>
 
                                 {/* Status Selector */}
                                 <div className="flex items-center gap-3">
@@ -295,7 +311,7 @@ export default function ContactDetailPage() {
                         </AlertDialogTitle>
                         <AlertDialogDescription className="space-y-3">
                             <p>
-                                Are you sure you want to delete <strong>{contact.name}</strong>?
+                                Are you sure you want to delete <strong>{displayName}</strong>?
                             </p>
 
                             {/* GDPR Permanent Delete Option */}
@@ -318,7 +334,7 @@ export default function ContactDetailPage() {
                                         <p className="text-xs text-red-700 mt-1">
                                             Permanently delete ALL data related to this contact including invoices,
                                             tasks, projects, and activity history. This action <strong>cannot be
-                                            undone</strong>. A deletion certificate will be generated for compliance.
+                                                undone</strong>. A deletion certificate will be generated for compliance.
                                         </p>
                                     </div>
                                 </div>

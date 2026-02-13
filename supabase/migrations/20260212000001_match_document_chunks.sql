@@ -4,7 +4,7 @@
 
 CREATE OR REPLACE FUNCTION match_document_chunks(
   query_embedding vector(1536),
-  match_org_id uuid,
+  match_tenant_id uuid,
   match_threshold float DEFAULT 0.5,
   match_count int DEFAULT 5,
   match_visibility text DEFAULT NULL, -- 'internal', 'shared', or NULL for all
@@ -40,7 +40,7 @@ BEGIN
   JOIN documents d ON dc.document_id = d.id
   WHERE
     -- Organization filter (required for multi-tenancy)
-    d.org_id = match_org_id
+    d.tenant_id = match_tenant_id
 
     -- Similarity threshold
     AND 1 - (dc.embedding <=> query_embedding) > match_threshold
@@ -75,7 +75,7 @@ GRANT EXECUTE ON FUNCTION match_document_chunks TO authenticated;
 -- Example usage:
 -- SELECT * FROM match_document_chunks(
 --   query_embedding := '{0.1, 0.2, ...}'::vector(1536),
---   match_org_id := '123e4567-e89b-12d3-a456-426614174000'::uuid,
+--   match_tenant_id := '123e4567-e89b-12d3-a456-426614174000'::uuid,
 --   match_threshold := 0.5,
 --   match_count := 5,
 --   match_visibility := 'internal'

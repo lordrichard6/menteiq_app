@@ -24,14 +24,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get user's org_id
+    // Get user's tenant_id
     const { data: profile } = await supabase
       .from('profiles')
-      .select('org_id')
+      .select('tenant_id')
       .eq('id', user.id)
       .single();
 
-    if (!profile?.org_id) {
+    if (!profile?.tenant_id) {
       return NextResponse.json({ error: 'No organization found' }, { status: 400 });
     }
 
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     const randomId = Math.random().toString(36).substring(2, 15);
     const ext = file.name.split('.').pop();
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storagePath = `${profile.org_id}/${timestamp}-${randomId}-${sanitizedName}`;
+    const storagePath = `${profile.tenant_id}/${timestamp}-${randomId}-${sanitizedName}`;
 
     // Upload to Supabase Storage
     const fileBuffer = await file.arrayBuffer();
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       .from('documents')
       .insert([
         {
-          org_id: profile.org_id,
+          tenant_id: profile.tenant_id,
           project_id: projectId,
           contact_id: contactId,
           name: file.name,

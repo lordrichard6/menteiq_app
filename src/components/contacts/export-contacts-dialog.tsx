@@ -67,7 +67,7 @@ export function ExportContactsDialog({ totalContacts }: ExportContactsDialogProp
 
       // Get filename from Content-Disposition header or generate one
       const contentDisposition = response.headers.get('Content-Disposition')
-      const filenameMatch = contentDisposition?.match(/filename="?(.+)"?/)
+      const filenameMatch = contentDisposition?.match(/filename="?([^";]+)"?/)
       const filename = filenameMatch?.[1] || `contacts-export.${options.format}`
 
       // Download file

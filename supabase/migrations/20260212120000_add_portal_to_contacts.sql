@@ -129,7 +129,10 @@ BEGIN
   SELECT
     c.id AS contact_id,
     c.email AS contact_email,
-    c.name AS contact_name,
+    CASE 
+      WHEN c.is_company THEN c.company_name 
+      ELSE c.first_name || ' ' || c.last_name 
+    END AS contact_name,
     c.tenant_id,
     (ps.expires_at > now() AND ps.used_at IS NULL) AS is_valid
   FROM portal_sessions ps

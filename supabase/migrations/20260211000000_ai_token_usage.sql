@@ -5,7 +5,7 @@
 -- Create token_usage table
 CREATE TABLE IF NOT EXISTS public.token_usage (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES public.organizations(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     conversation_id UUID NOT NULL REFERENCES public.ai_conversations(id) ON DELETE CASCADE,
 
@@ -29,11 +29,11 @@ CREATE TABLE IF NOT EXISTS public.token_usage (
 );
 
 -- Create indexes for common queries
-CREATE INDEX idx_token_usage_org_id ON public.token_usage(org_id);
+CREATE INDEX idx_token_usage_tenant_id ON public.token_usage(tenant_id);
 CREATE INDEX idx_token_usage_user_id ON public.token_usage(user_id);
 CREATE INDEX idx_token_usage_conversation_id ON public.token_usage(conversation_id);
 CREATE INDEX idx_token_usage_created_at ON public.token_usage(created_at DESC);
-CREATE INDEX idx_token_usage_org_date ON public.token_usage(org_id, created_at DESC);
+CREATE INDEX idx_token_usage_tenant_date ON public.token_usage(tenant_id, created_at DESC);
 
 -- Enable Row Level Security
 ALTER TABLE public.token_usage ENABLE ROW LEVEL SECURITY;
@@ -43,8 +43,8 @@ ALTER TABLE public.token_usage ENABLE ROW LEVEL SECURITY;
 CREATE POLICY token_usage_select_policy ON public.token_usage
     FOR SELECT
     USING (
-        org_id IN (
-            SELECT org_id FROM public.profiles
+        tenant_id IN (
+            SELECT tenant_id FROM public.profiles
             WHERE id = auth.uid()
         )
     );
@@ -53,8 +53,8 @@ CREATE POLICY token_usage_select_policy ON public.token_usage
 CREATE POLICY token_usage_insert_policy ON public.token_usage
     FOR INSERT
     WITH CHECK (
-        org_id IN (
-            SELECT org_id FROM public.profiles
+        tenant_id IN (
+            SELECT tenant_id FROM public.profiles
             WHERE id = auth.uid()
         )
     );
@@ -71,7 +71,7 @@ COMMENT ON COLUMN public.token_usage.estimated_cost_cents IS 'Estimated cost in 
 -- Create a view for aggregated token usage by organization
 CREATE OR REPLACE VIEW public.token_usage_summary AS
 SELECT
-    org_id,
+    tenant_id,
     DATE_TRUNC('month', created_at) AS month,
     provider,
     model,
@@ -82,8 +82,8 @@ SELECT
     SUM(estimated_cost_cents) AS total_cost_cents,
     ROUND(SUM(estimated_cost_cents) / 100.0, 2) AS total_cost_usd
 FROM public.token_usage
-GROUP BY org_id, DATE_TRUNC('month', created_at), provider, model
-ORDER BY month DESC, org_id, provider, model;
+GROUP BY tenant_id, DATE_TRUNC('month', created_at), provider, model
+ORDER BY month DESC, tenant_id, provider, model;
 
 COMMENT ON VIEW public.token_usage_summary IS 'Monthly aggregated token usage and costs by organization';
 
