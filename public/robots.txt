@@ -1,0 +1,18 @@
+# https://www.robotstxt.org/robotstxt.html
+User-agent: *
+Allow: /
+
+# Block private app routes from indexing
+Disallow: /dashboard
+Disallow: /contacts
+Disallow: /invoices
+Disallow: /documents
+Disallow: /projects
+Disallow: /tasks
+Disallow: /settings
+Disallow: /chat
+Disallow: /activity
+Disallow: /portal
+Disallow: /api/
+
+Sitemap: https://app.orbitcrm.com/sitemap.xml

@@ -75,13 +75,13 @@ export async function POST(request: NextRequest) {
         document.file_type || 'application/pdf'
       );
 
-      console.log(`Processing document ${documentId}: ${chunks.length} chunks created`);
+      // chunks.length chunks created for documentId
 
       // Generate embeddings for all chunks (batch)
       const chunkTexts = chunks.map(c => c.content);
       const { embeddings, totalTokens } = await generateEmbeddings(chunkTexts);
 
-      console.log(`Generated ${embeddings.length} embeddings using ${totalTokens} tokens`);
+      // embeddings.length embeddings generated using totalTokens tokens
 
       // Store chunks with embeddings in database
       const chunkRecords = chunks.map((chunk, index) => ({

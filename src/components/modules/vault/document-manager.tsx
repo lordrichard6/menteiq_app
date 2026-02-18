@@ -118,7 +118,6 @@ export function DocumentManager() {
             }
 
             const result = await response.json();
-            console.log('Document processed:', result);
 
             // Refresh documents to show updated status
             fetchDocs();

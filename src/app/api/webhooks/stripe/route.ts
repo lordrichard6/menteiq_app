@@ -66,7 +66,6 @@ export async function POST(request: NextRequest) {
         // Mark the invoice as paid
         try {
           await InvoiceService.markAsPaid(invoiceId, session.id);
-          console.log(`Invoice ${invoiceId} marked as paid via Stripe session ${session.id}`);
         } catch (error) {
           console.error(`Failed to mark invoice ${invoiceId} as paid:`, error);
           // Don't return error - Stripe will retry on 5xx
@@ -81,7 +80,6 @@ export async function POST(request: NextRequest) {
         const invoiceId = session.metadata?.invoice_id;
         
         if (invoiceId) {
-          console.log(`Payment session expired for invoice ${invoiceId}`);
           // Could update invoice status or send notification
         }
         
@@ -89,22 +87,17 @@ export async function POST(request: NextRequest) {
       }
 
       case 'payment_intent.succeeded': {
-        // Handle direct payment intent success (alternative to checkout.session.completed)
-        const paymentIntent = event.data.object;
-        console.log(`Payment intent succeeded: ${paymentIntent.id}`);
+        // Payment intent succeeded — no action required; checkout.session.completed handles invoice update
         break;
       }
 
       case 'payment_intent.payment_failed': {
-        // Handle payment failure
-        const paymentIntent = event.data.object;
-        console.log(`Payment failed: ${paymentIntent.id}`);
+        // Payment failed — could notify user or update invoice status in future
         break;
       }
 
       default:
-        // Log unhandled event types for debugging
-        console.log(`Unhandled event type: ${event.type}`);
+        // Unhandled event type — safe to ignore
     }
 
     // Return success response

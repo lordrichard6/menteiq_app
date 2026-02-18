@@ -23,9 +23,8 @@ export const BookingService = {
         return (data as any) || [];
     },
 
-    async mockCreateBooking(title: string, date: Date) {
+    async mockCreateBooking(_title: string, _date: Date) {
         // Logic to sync with external calendar would go here
-        console.log("Creating booking in Google Calendar...", title, date);
         return true;
     }
 };

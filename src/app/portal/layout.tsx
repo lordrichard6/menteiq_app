@@ -26,9 +26,8 @@ export default async function PortalLayout({
                 orgLogo = (org.settings as any)?.logo_url || null;
             }
         }
-    } catch (error) {
+    } catch {
         // If not authenticated, just use defaults
-        console.log('Portal layout: No session found');
     }
 
     return (
