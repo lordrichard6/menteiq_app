@@ -8,6 +8,9 @@
     "start": "next start",
     "lint": "eslint"
   },
+  "notes": {
+    "xlsx": "SheetJS (xlsx) has known high-severity vulns (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9). No safe upgrade path exists on npm — SheetJS moved to commercial model after 0.18.5. Options: (1) replace with exceljs, (2) pin and accept risk for internal-only use, (3) purchase SheetJS Pro license."
+  },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.41",
     "@ai-sdk/google": "^3.0.24",
@@ -42,7 +45,7 @@
     "libphonenumber-js": "^1.12.36",
     "lucide-react": "^0.562.0",
     "mammoth": "^1.11.0",
-    "next": "16.1.2",
+    "next": "^16.1.6",
     "papaparse": "^5.5.3",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.17.2",
@@ -68,7 +71,7 @@
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.2",
+    "eslint-config-next": "^16.1.6",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5"
