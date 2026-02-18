@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { sendPortalInvitation } from '@/lib/email/resend-client';
+import { inviteLimiter, rateLimitResponse } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,10 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    // Rate limit: 5 invitations per 10 minutes per user (prevents email abuse)
+    const rl = inviteLimiter.check(user.id);
+    if (!rl.success) return rateLimitResponse(rl.resetAt);
 
     // Get contact details
     const { data: contact, error: contactError } = await supabase

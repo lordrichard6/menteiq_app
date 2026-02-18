@@ -6,6 +6,7 @@ import { google } from '@ai-sdk/google';
 import { RagService } from '@/lib/ai/rag';
 import { createClient } from '@/lib/supabase/server';
 import { z } from 'zod';
+import { chatLimiter, rateLimitResponse } from '@/lib/rate-limit';
 
 export const maxDuration = 30;
 
@@ -46,6 +47,10 @@ export async function POST(req: Request) {
     if (!user) {
         return new Response('Unauthorized', { status: 401 });
     }
+
+    // Rate limit: 20 AI requests per minute per user
+    const rl = chatLimiter.check(user.id);
+    if (!rl.success) return rateLimitResponse(rl.resetAt);
 
     // Get User Role to determine RAG permissions
     const { data: profile } = await supabase.from('profiles').select('tenant_id, role').eq('id', user.id).single();
