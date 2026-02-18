@@ -1,28 +1,43 @@
 /**
  * OrbitCRM Pricing Configuration
- * 
- * Defines subscription tiers, token allocations, and model access.
+ *
+ * 4-tier structure designed for sustainable margins:
+ *
+ *  Free       €0    —  1,000 tokens/mo  | 100 tokens/day cap | GPT-4o Mini only
+ *  Pro        €29   — 50,000 tokens/mo  | no daily cap       | GPT-4o, Gemini, Sonnet
+ *  Business   €79   — 200,000 tokens/mo | no daily cap       | All models excl. Opus 4
+ *  Enterprise €199  — 500,000 tokens/mo | no daily cap       | All models incl. Opus 4
+ *
+ * Token multipliers apply effective cost pressure — Opus 4 (×10) on Enterprise
+ * means 500K "effective" tokens ≈ 50K real Opus tokens (~€10 cost at $15/1M input).
+ * This protects margin while keeping the headline number generous.
  */
 
-export type SubscriptionTier = 'free' | 'pro' | 'business';
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type SubscriptionTier = 'free' | 'pro' | 'business' | 'enterprise';
 
 export interface TierConfig {
   id: SubscriptionTier;
   name: string;
-  price: number; // EUR per month
-  tokenAllocation: number;
+  price: number;              // EUR per month
+  tokenAllocation: number;    // Monthly effective token pool (-1 = unlimited, removed)
+  dailyCap: number;           // Free tier only; 0 = no daily cap
   maxUsers: number;
   storageGb: number;
   availableModels: AIModel[];
-  maxPacks: number;
+  maxPacks: number;           // -1 = unlimited
   features: string[];
+  highlighted?: boolean;      // Show "Popular" badge
+  ctaLabel: string;
+  ctaHref: string;
 }
 
-export type AIModel = 
+export type AIModel =
   | 'gpt-4o-mini'
   | 'gpt-4o'
   | 'claude-3-5-sonnet'
-  | 'claude-3-opus'
+  | 'claude-opus-4'
   | 'gemini-pro';
 
 export interface ModelConfig {
@@ -30,68 +45,115 @@ export interface ModelConfig {
   name: string;
   provider: 'openai' | 'anthropic' | 'google';
   minimumTier: SubscriptionTier;
+  /** Effective token multiplier — charged against token_balance as (real_tokens × multiplier) */
   tokenMultiplier: number;
   description: string;
+  badge?: string;             // e.g. "Most Capable"
 }
 
-// Tier configurations
+// ─── Tiers ───────────────────────────────────────────────────────────────────
+
+export const TIER_ORDER: SubscriptionTier[] = ['free', 'pro', 'business', 'enterprise'];
+
 export const tiers: Record<SubscriptionTier, TierConfig> = {
   free: {
     id: 'free',
     name: 'Free',
     price: 0,
-    tokenAllocation: 1000,
+    tokenAllocation: 1_000,
+    dailyCap: 100,            // 100 tokens/day prevents single-session burnout
     maxUsers: 1,
     storageGb: 1,
     availableModels: ['gpt-4o-mini'],
     maxPacks: 0,
+    ctaLabel: 'Start Free',
+    ctaHref: 'https://app.orbitcrm.com/signup',
     features: [
-      'Core modules (Contacts, Tasks, Invoicing)',
-      'AI Chat with GPT-4o Mini',
-      'RAG Knowledge Base',
-      'Swiss QR-Bill invoicing',
-      'EU IBAN invoicing',
+      'CRM, Tasks, Invoicing',
+      '1,000 AI tokens / month',
+      '100 AI tokens / day',
+      'GPT-4o Mini',
+      'Swiss QR-Bill & EU IBAN',
+      'Client portal (read-only)',
+      'Community support',
     ],
   },
+
   pro: {
     id: 'pro',
     name: 'Pro',
     price: 29,
-    tokenAllocation: 50000,
+    tokenAllocation: 50_000,
+    dailyCap: 0,
     maxUsers: 1,
     storageGb: 10,
     availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'gemini-pro'],
     maxPacks: 1,
+    highlighted: true,
+    ctaLabel: 'Get Started',
+    ctaHref: 'https://app.orbitcrm.com/signup?plan=pro',
     features: [
       'Everything in Free',
-      '50K AI tokens/month',
-      'All AI models',
+      '50,000 AI tokens / month',
+      'GPT-4o, Claude 3.5 Sonnet, Gemini Pro',
+      'AI Knowledge Base (RAG)',
+      'Document Vault (10 GB)',
       '1 vertical pack of choice',
       'Priority email support',
     ],
   },
+
   business: {
     id: 'business',
     name: 'Business',
     price: 79,
-    tokenAllocation: -1, // Unlimited
+    tokenAllocation: 200_000,
+    dailyCap: 0,
     maxUsers: 10,
     storageGb: 50,
-    availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'claude-3-opus', 'gemini-pro'],
-    maxPacks: -1, // Unlimited
+    // Opus 4 deliberately excluded — too expensive to subsidise at this price point
+    availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'gemini-pro'],
+    maxPacks: -1,
+    ctaLabel: 'Get Started',
+    ctaHref: 'https://app.orbitcrm.com/signup?plan=business',
     features: [
       'Everything in Pro',
-      'Unlimited AI tokens',
-      'All vertical packs',
+      '200,000 AI tokens / month',
       'Up to 10 users',
       'Team collaboration',
-      'API access',
+      'All vertical packs',
+      'Document Vault (50 GB)',
       'SLA support',
+    ],
+  },
+
+  enterprise: {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 199,
+    tokenAllocation: 500_000,
+    dailyCap: 0,
+    maxUsers: -1,             // Unlimited users
+    storageGb: 200,
+    availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'claude-opus-4', 'gemini-pro'],
+    maxPacks: -1,
+    ctaLabel: 'Contact Sales',
+    ctaHref: 'mailto:sales@orbitcrm.com',
+    features: [
+      'Everything in Business',
+      '500,000 AI tokens / month',
+      'Claude Opus 4 (most capable)',
+      'Unlimited users',
+      'Custom integrations',
+      'Document Vault (200 GB)',
+      'Dedicated account manager',
+      'Custom SLA',
     ],
   },
 };
 
-// Model configurations
+// ─── Models ──────────────────────────────────────────────────────────────────
+
 export const models: Record<AIModel, ModelConfig> = {
   'gpt-4o-mini': {
     id: 'gpt-4o-mini',
@@ -99,7 +161,7 @@ export const models: Record<AIModel, ModelConfig> = {
     provider: 'openai',
     minimumTier: 'free',
     tokenMultiplier: 1,
-    description: 'Fast and efficient for everyday tasks',
+    description: 'Fast and efficient — great for everyday tasks',
   },
   'gpt-4o': {
     id: 'gpt-4o',
@@ -115,15 +177,16 @@ export const models: Record<AIModel, ModelConfig> = {
     provider: 'anthropic',
     minimumTier: 'pro',
     tokenMultiplier: 3,
-    description: 'Excellent for writing and analysis',
+    description: 'Excellent for writing, analysis, and long documents',
   },
-  'claude-3-opus': {
-    id: 'claude-3-opus',
-    name: 'Claude 3 Opus',
+  'claude-opus-4': {
+    id: 'claude-opus-4',
+    name: 'Claude Opus 4',
     provider: 'anthropic',
-    minimumTier: 'business',
-    tokenMultiplier: 5,
-    description: 'Premium quality for complex tasks',
+    minimumTier: 'enterprise',
+    tokenMultiplier: 10,      // ×10 protects margin: 500K eff. = 50K real Opus tokens
+    description: 'Most capable model for complex reasoning',
+    badge: 'Most Powerful',
   },
   'gemini-pro': {
     id: 'gemini-pro',
@@ -131,90 +194,83 @@ export const models: Record<AIModel, ModelConfig> = {
     provider: 'google',
     minimumTier: 'pro',
     tokenMultiplier: 2,
-    description: 'Google AI with broad knowledge',
+    description: 'Google AI with broad up-to-date knowledge',
   },
 };
 
-// Token pack configurations
+// ─── Token Packs (add-ons) ────────────────────────────────────────────────────
+
 export interface TokenPack {
   id: string;
   name: string;
   tokens: number;
-  price: number;
+  price: number;              // EUR one-time
   pricePerThousand: number;
+  availableFrom: SubscriptionTier;
 }
 
 export const tokenPacks: TokenPack[] = [
   {
     id: 'starter',
     name: 'Starter Pack',
-    tokens: 25000,
+    tokens: 25_000,
     price: 10,
     pricePerThousand: 0.40,
+    availableFrom: 'pro',
   },
   {
     id: 'plus',
     name: 'Plus Pack',
-    tokens: 100000,
+    tokens: 100_000,
     price: 35,
     pricePerThousand: 0.35,
+    availableFrom: 'pro',
   },
   {
-    id: 'pro',
-    name: 'Pro Pack',
-    tokens: 500000,
+    id: 'power',
+    name: 'Power Pack',
+    tokens: 500_000,
     price: 150,
     pricePerThousand: 0.30,
+    availableFrom: 'business',
   },
 ];
 
-// Utility functions
+// ─── Utility functions ────────────────────────────────────────────────────────
 
-/**
- * Check if a user can access a specific model
- */
+/** Check if a tier can access a model */
 export function canAccessModel(tier: SubscriptionTier, modelId: AIModel): boolean {
   const model = models[modelId];
-  const tierOrder: SubscriptionTier[] = ['free', 'pro', 'business'];
-  return tierOrder.indexOf(tier) >= tierOrder.indexOf(model.minimumTier);
+  return TIER_ORDER.indexOf(tier) >= TIER_ORDER.indexOf(model.minimumTier);
 }
 
-/**
- * Get available models for a tier
- */
+/** Get all models available for a tier */
 export function getAvailableModels(tier: SubscriptionTier): ModelConfig[] {
-  return Object.values(models).filter(model => canAccessModel(tier, model.id));
+  return Object.values(models).filter(m => canAccessModel(tier, m.id));
 }
 
 /**
- * Calculate effective token cost
+ * Calculate effective token cost after applying model multiplier.
+ * This is what gets charged against the organisation's token_balance.
  */
-export function calculateTokenCost(tokens: number, modelId: AIModel): number {
-  const model = models[modelId];
-  return Math.ceil(tokens * model.tokenMultiplier);
+export function calculateEffectiveTokens(realTokens: number, modelId: AIModel): number {
+  return Math.ceil(realTokens * models[modelId].tokenMultiplier);
 }
 
-/**
- * Check if organization has sufficient tokens
- */
+/** Check whether an org has sufficient effective tokens */
 export function hasTokens(
   monthlyBalance: number,
   packBalance: number,
   required: number,
-  tier: SubscriptionTier
 ): boolean {
-  if (tier === 'business') return true; // Unlimited
   return (monthlyBalance + packBalance) >= required;
 }
 
-/**
- * Get tier upgrade suggestion
- */
-export function getSuggestedUpgrade(
-  currentTier: SubscriptionTier,
-  reason: 'tokens' | 'models' | 'packs' | 'users'
-): SubscriptionTier | null {
-  if (currentTier === 'business') return null;
-  if (currentTier === 'pro') return 'business';
-  return 'pro';
+/** Return the next tier up for an upgrade prompt */
+export function getSuggestedUpgrade(currentTier: SubscriptionTier): SubscriptionTier | null {
+  const idx = TIER_ORDER.indexOf(currentTier);
+  return idx < TIER_ORDER.length - 1 ? TIER_ORDER[idx + 1] : null;
 }
+
+/** Free tier: effective daily token allowance */
+export const FREE_DAILY_CAP = tiers.free.dailyCap; // 100

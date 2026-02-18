@@ -17,6 +17,7 @@ import {
 import { AVAILABLE_MODELS } from '@/types/chat'
 import { cn } from '@/lib/utils'
 import { Plus, Send, Bot, X, MessageSquare, Loader2 } from 'lucide-react'
+import { TokenUsageMeter } from '@/components/token-usage-meter'
 
 export default function ChatPage() {
     const {
@@ -194,6 +195,11 @@ export default function ChatPage() {
                                 ))}
                             </div>
                         )}
+
+                        {/* Token usage meter */}
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                            <TokenUsageMeter />
+                        </div>
                     </CardContent>
                 </Card>
 
