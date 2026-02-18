@@ -1,4 +1,6 @@
-import pdf from 'pdf-parse/lib/pdf-parse.js';
+// pdf-parse v1.1.1 — uses CJS default export; require() avoids Turbopack ESM issues
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pdf = require('pdf-parse');
 import mammoth from 'mammoth';
 import { createClient } from '@/lib/supabase/server';
 
