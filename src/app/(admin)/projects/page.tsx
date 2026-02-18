@@ -464,7 +464,7 @@ export default function ProjectsPage() {
             ) : (
                 <ProjectKanbanBoard
                     projects={projects}
-                    onStatusChange={updateProject}
+                    onStatusChange={(id, status) => updateProject(id, { status })}
                 />
             )}
 

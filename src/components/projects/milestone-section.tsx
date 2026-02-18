@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useMilestoneStore } from '@/stores/milestone-store'
+import { useTaskStore } from '@/stores/task-store'
+import { useTimeStore } from '@/stores/time-store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Flag, Calendar, MoreVertical, CheckCircle2, Circle, Clock, Loader2 } from 'lucide-react'
+import { Plus, Flag, Calendar, MoreVertical, CheckCircle2, Circle, Clock, Loader2, BarChart3 } from 'lucide-react'
 import { format } from 'date-fns'
 import {
     Dialog,
@@ -25,6 +27,8 @@ interface MilestoneSectionProps {
 
 export function MilestoneSection({ projectId }: MilestoneSectionProps) {
     const { milestones, isLoading, fetchMilestones, addMilestone, updateMilestone } = useMilestoneStore()
+    const { tasks } = useTaskStore()
+    const { timeEntries } = useTimeStore()
     const [isAddOpen, setIsAddOpen] = useState(false)
     const [newName, setNewName] = useState('')
     const [newDueDate, setNewDueDate] = useState('')
@@ -102,39 +106,79 @@ export function MilestoneSection({ projectId }: MilestoneSectionProps) {
                             No milestones defined yet.
                         </div>
                     ) : (
-                        milestones.map((m) => (
-                            <div
-                                key={m.id}
-                                className="group flex items-center justify-between p-3 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                            >
-                                <div className="flex items-center gap-3 min-w-0">
-                                    <button
-                                        onClick={() => toggleStatus(m)}
-                                        className="flex-shrink-0"
-                                    >
-                                        {m.status === 'completed' ? (
-                                            <CheckCircle2 className="h-5 w-5 text-[#9EAE8E]" />
-                                        ) : (
-                                            <Circle className="h-5 w-5 text-slate-300" />
-                                        )}
-                                    </button>
-                                    <div className="min-w-0">
-                                        <p className={`font-medium text-sm truncate ${m.status === 'completed' ? 'text-slate-400 line-through' : 'text-[#3D4A67]'}`}>
-                                            {m.name}
-                                        </p>
-                                        {m.due_date && (
-                                            <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                                <Clock className="h-3 w-3" />
-                                                {format(new Date(m.due_date), 'MMM d, yyyy')}
+                        milestones.map((m) => {
+                            const milestoneTasks = tasks.filter(t => t.milestone_id === m.id)
+                            const completedTasks = milestoneTasks.filter(t => t.status === 'done').length
+                            const taskProgress = milestoneTasks.length > 0
+                                ? (completedTasks / milestoneTasks.length) * 100
+                                : m.status === 'completed' ? 100 : 0
+
+                            const milestoneHours = timeEntries
+                                .filter(e => milestoneTasks.some(t => t.id === e.task_id))
+                                .reduce((acc, curr) => acc + curr.duration_minutes, 0)
+
+                            const formatDuration = (mins: number) => {
+                                const h = Math.floor(mins / 60)
+                                const m = mins % 60
+                                return m === 0 ? `${h}h` : `${h}h ${m}m`
+                            }
+
+                            return (
+                                <div
+                                    key={m.id}
+                                    className="group flex flex-col p-3 rounded-lg hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100 space-y-3"
+                                >
+                                    <div className="flex items-start justify-between">
+                                        <div className="flex items-start gap-3 min-w-0">
+                                            <button
+                                                onClick={() => toggleStatus(m)}
+                                                className="mt-0.5 flex-shrink-0"
+                                            >
+                                                {m.status === 'completed' ? (
+                                                    <CheckCircle2 className="h-5 w-5 text-[#9EAE8E]" />
+                                                ) : (
+                                                    <Circle className="h-5 w-5 text-slate-300" />
+                                                )}
+                                            </button>
+                                            <div className="min-w-0">
+                                                <p className={`font-semibold text-sm truncate ${m.status === 'completed' ? 'text-slate-400 line-through' : 'text-[#3D4A67]'}`}>
+                                                    {m.name}
+                                                </p>
+                                                {m.due_date && (
+                                                    <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                                                        <Clock className="h-3 w-3" />
+                                                        {format(new Date(m.due_date), 'MMM d, yyyy')}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {milestoneHours > 0 && (
+                                                <Badge variant="secondary" className="h-5 text-[10px] bg-[#9EAE8E]/10 text-[#7E8E6E] hover:bg-[#9EAE8E]/20 border-0 px-1.5 shadow-none">
+                                                    {formatDuration(milestoneHours)}
+                                                </Badge>
+                                            )}
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </div>
+
+                                    {milestoneTasks.length > 0 && (
+                                        <div className="space-y-1 px-8">
+                                            <div className="flex justify-between items-center text-[10px] font-medium text-slate-400">
+                                                <span className="flex items-center gap-1">
+                                                    <BarChart3 className="h-3 w-3" />
+                                                    Tasks: {completedTasks}/{milestoneTasks.length}
+                                                </span>
+                                                <span>{Math.round(taskProgress)}%</span>
+                                            </div>
+                                            <Progress value={taskProgress} className="h-1 bg-slate-100" />
+                                        </div>
+                                    )}
                                 </div>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <MoreVertical className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        ))
+                            )
+                        })
                     )}
                 </div>
             </CardContent>

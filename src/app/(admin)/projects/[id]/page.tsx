@@ -33,6 +33,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS, ProjectStatus } from '@/types/project'
+import { TASK_PRIORITY_COLORS } from '@/types/task'
 import {
     ChevronLeft,
     Calendar,
@@ -69,7 +70,7 @@ export default function ProjectDetailPage() {
     const projectId = params.id as string
     const { getProject, fetchProjects, isLoading, updateProject } = useProjectStore()
     const { contacts, fetchContacts } = useContactStore()
-    const { tasks, fetchTasks } = useTaskStore()
+    const { tasks, fetchTasks, updateStatus } = useTaskStore()
     const { invoices, fetchInvoices } = useInvoiceStore()
     const { documents, fetchDocuments } = useDocumentStore()
     const project = getProject(projectId)
@@ -555,17 +556,30 @@ export default function ProjectDetailPage() {
                                                     <p className={`font-medium ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-[#3D4A67]'}`}>
                                                         {task.title}
                                                     </p>
-                                                    <div className="flex items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2">
                                                         {task.dueDate && (
                                                             <p className="text-xs text-slate-500 flex items-center gap-1">
                                                                 <Calendar className="h-3 w-3" />
-                                                                {format(task.dueDate, 'MMM d, yyyy')}
+                                                                {format(new Date(task.dueDate), 'MMM d, yyyy')}
                                                             </p>
                                                         )}
                                                         {isBlocked && (
-                                                            <span className="text-[10px] font-bold text-amber-600 uppercase tracking-tighter bg-amber-50 px-1 border border-amber-100 rounded">
-                                                                Blocked
-                                                            </span>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-tighter bg-amber-50 px-1 border border-amber-100 rounded">
+                                                                    Blocked by:
+                                                                </span>
+                                                                {task.dependencies?.map(depId => {
+                                                                    const depTask = tasks.find(t => t.id === depId)
+                                                                    if (depTask && depTask.status !== 'done') {
+                                                                        return (
+                                                                            <span key={depId} className="text-[10px] bg-slate-200 text-slate-600 px-1 rounded truncate max-w-[100px]">
+                                                                                {depTask.title}
+                                                                            </span>
+                                                                        )
+                                                                    }
+                                                                    return null
+                                                                })}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </div>

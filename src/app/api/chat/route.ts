@@ -99,9 +99,9 @@ Be concise, professional, and helpful.`,
                         conversation_id: conversationId,
                         model: selectedModel,
                         provider: getProvider(selectedModel),
-                        prompt_tokens: usage.promptTokens || 0,
-                        completion_tokens: usage.completionTokens || 0,
-                        total_tokens: usage.totalTokens || 0,
+                        prompt_tokens: usage.inputTokens || 0,
+                        completion_tokens: usage.outputTokens || 0,
+                        total_tokens: (usage.inputTokens || 0) + (usage.outputTokens || 0),
                         estimated_cost_cents: 0, // TODO: Calculate based on pricing
                     });
                 } catch (error) {

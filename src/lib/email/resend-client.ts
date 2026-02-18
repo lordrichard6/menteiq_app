@@ -5,8 +5,16 @@
 
 import { Resend } from 'resend';
 
-// Initialize Resend client
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy-initialize Resend client to avoid build-time errors when env var is absent
+let _resend: Resend | null = null;
+function getResend(): Resend {
+  if (!_resend) {
+    _resend = new Resend(process.env.RESEND_API_KEY);
+  }
+  return _resend;
+}
+/** @deprecated Use getResend() internally; exported for legacy consumers */
+const resend = { get emails() { return getResend().emails; } } as Resend;
 
 // Default sender email (you'll need to verify this domain in Resend)
 const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'OrbitCRM <noreply@orbitcrm.app>';
@@ -27,7 +35,7 @@ export async function sendEmail(options: SendEmailOptions) {
   try {
     const { to, subject, html, text, from = DEFAULT_FROM, replyTo } = options;
 
-    const data = await resend.emails.send({
+    const data = await getResend().emails.send({
       from,
       to,
       subject,

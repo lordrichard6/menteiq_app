@@ -11,11 +11,11 @@ import { logActivity } from '@/lib/activity-log'
 
 export async function DELETE(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient()
-        const contactId = params.id
+        const { id: contactId } = await params
 
         // Verify user is authenticated
         const { data: { user }, error: authError } = await supabase.auth.getUser()

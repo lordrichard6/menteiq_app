@@ -28,10 +28,12 @@ export function SeedDataButton() {
         // Add contacts
         mockContacts.forEach((contact) => {
             addContact({
-                name: contact.name,
+                firstName: contact.firstName,
+                lastName: contact.lastName,
+                isCompany: contact.isCompany,
+                companyName: contact.companyName,
                 email: contact.email,
                 phone: contact.phone,
-                company: contact.company,
                 status: contact.status,
                 tags: contact.tags,
             })

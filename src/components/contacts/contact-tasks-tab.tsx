@@ -33,7 +33,7 @@ export function ContactTasksTab({ contact }: ContactTasksTabProps) {
     const [filter, setFilter] = useState<'all' | 'todo' | 'in_progress' | 'done'>('all')
 
     const contactTasks = useMemo(() => {
-        const filtered = tasks.filter(task => task.contact_id === contact.id)
+        const filtered = tasks.filter(task => task.contactId === contact.id)
         if (filter === 'all') return filtered
         return filtered.filter(task => task.status === filter)
     }, [tasks, contact.id, filter])
@@ -123,10 +123,10 @@ export function ContactTasksTab({ contact }: ContactTasksTabProps) {
                                                 {task.description}
                                             </p>
                                         )}
-                                        {task.due_date && (
+                                        {task.dueDate && (
                                             <div className="flex items-center gap-1 mt-2 text-xs text-slate-500">
                                                 <Calendar className="h-3 w-3" />
-                                                Due: {new Date(task.due_date).toLocaleDateString('de-CH')}
+                                                Due: {new Date(task.dueDate).toLocaleDateString('de-CH')}
                                             </div>
                                         )}
                                     </div>

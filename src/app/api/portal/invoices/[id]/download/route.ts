@@ -12,11 +12,11 @@ import { getPortalSession } from '@/lib/portal/session';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const supabase = await createClient();
-    const invoiceId = params.id;
+    const { id: invoiceId } = await params;
 
     // Get portal session (verify client is authenticated)
     const session = await getPortalSession();

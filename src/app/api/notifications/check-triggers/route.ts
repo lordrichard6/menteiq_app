@@ -17,6 +17,16 @@ import {
   FollowUpReminderEmail,
 } from '@/lib/email/notification-templates';
 
+/** Supabase returns joined rows as arrays; extract the first element's property safely */
+function joinedField<T extends Record<string, unknown>>(
+  val: T | T[] | null | undefined,
+  key: keyof T,
+): T[keyof T] | undefined {
+  if (!val) return undefined;
+  const item = Array.isArray(val) ? val[0] : val;
+  return item?.[key];
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -78,7 +88,7 @@ export async function POST(request: NextRequest) {
             p_user_id: user.id,
             p_type: 'invoice_overdue',
             p_title: `Invoice #${invoice.invoice_number} is overdue`,
-            p_message: `Invoice for ${invoice.contacts?.name || 'customer'} is ${daysOverdue} days overdue (CHF ${invoice.total})`,
+            p_message: `Invoice for ${joinedField(invoice.contacts as any, 'name') || 'customer'} is ${daysOverdue} days overdue (CHF ${invoice.total})`,
             p_priority: daysOverdue > 30 ? 'high' : 'medium',
             p_related_id: invoice.id,
             p_related_type: 'invoice',
@@ -93,7 +103,7 @@ export async function POST(request: NextRequest) {
               const emailHtml = OverdueInvoiceEmail({
                 userName: user.full_name || user.email,
                 invoiceNumber: invoice.invoice_number,
-                customerName: invoice.contacts?.name || 'Customer',
+                customerName: (joinedField(invoice.contacts as any, 'name') as string) || 'Customer',
                 amount: invoice.total,
                 daysOverdue,
                 invoiceUrl: `${process.env.NEXT_PUBLIC_APP_URL}/admin/invoices/${invoice.id}`,
@@ -162,7 +172,7 @@ export async function POST(request: NextRequest) {
                 userName: user.full_name || user.email,
                 taskTitle: task.title,
                 dueDate: new Date(task.due_date),
-                contactName: task.contacts?.name,
+                contactName: joinedField(task.contacts as any, 'name') as string | undefined,
                 taskUrl: `${process.env.NEXT_PUBLIC_APP_URL}/admin/tasks/${task.id}`,
               });
 

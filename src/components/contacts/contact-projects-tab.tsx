@@ -14,17 +14,19 @@ interface ContactProjectsTabProps {
 }
 
 const STATUS_COLORS = {
-    planning: 'bg-slate-100 text-slate-700',
+    lead: 'bg-purple-100 text-purple-700',
     active: 'bg-blue-100 text-blue-700',
     completed: 'bg-green-100 text-green-700',
     on_hold: 'bg-yellow-100 text-yellow-700',
+    archived: 'bg-slate-100 text-slate-500',
 }
 
 const STATUS_LABELS = {
-    planning: 'Planning',
+    lead: 'Lead',
     active: 'Active',
     completed: 'Completed',
     on_hold: 'On Hold',
+    archived: 'Archived',
 }
 
 export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
@@ -33,7 +35,7 @@ export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
     const [filter, setFilter] = useState<'all' | 'planning' | 'active' | 'completed' | 'on_hold'>('all')
 
     const contactProjects = useMemo(() => {
-        const filtered = projects.filter(proj => proj.contact_id === contact.id)
+        const filtered = projects.filter(proj => proj.clientId === contact.id)
         if (filter === 'all') return filtered
         return filtered.filter(proj => proj.status === filter)
     }, [projects, contact.id, filter])
@@ -116,12 +118,12 @@ export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
                                             <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
                                                 <div className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    Started: {new Date(project.start_date).toLocaleDateString('de-CH')}
+                                                    Started: {new Date(project.createdAt).toLocaleDateString('de-CH')}
                                                 </div>
-                                                {project.end_date && (
+                                                {project.deadline && (
                                                     <div className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
-                                                        Deadline: {new Date(project.end_date).toLocaleDateString('de-CH')}
+                                                        Deadline: {new Date(project.deadline).toLocaleDateString('de-CH')}
                                                     </div>
                                                 )}
                                             </div>

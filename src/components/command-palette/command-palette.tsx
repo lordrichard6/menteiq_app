@@ -355,7 +355,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                                 <p className="text-sm">No commands found</p>
                             </div>
                         ) : (
-                            Object.entries(groupedCommands).map(([category, commands]) => (
+                            (Object.entries(groupedCommands) as [string, Command[]][]).map(([category, commands]) => (
                                 <div key={category} className="mb-4 last:mb-0">
                                     <div className="px-2 py-1 text-xs font-semibold text-slate-500 uppercase">
                                         {categoryLabels[category as keyof typeof categoryLabels]}

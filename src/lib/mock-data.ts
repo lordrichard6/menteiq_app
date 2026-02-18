@@ -107,7 +107,7 @@ export const mockProjects: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>[] = [
         name: 'StartupHub Mobile App',
         description: 'iOS and Android app for community engagement',
         clientName: 'StartupHub',
-        status: 'planning',
+        status: 'lead',
     },
     {
         name: 'Global Ventures CRM Integration',
@@ -119,7 +119,7 @@ export const mockProjects: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>[] = [
         name: 'RetailPlus E-commerce Platform',
         description: 'New e-commerce platform with AI recommendations',
         clientName: 'RetailPlus',
-        status: 'planning',
+        status: 'lead',
     },
     {
         name: 'Design Studio Brand Guidelines',

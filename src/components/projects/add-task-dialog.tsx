@@ -21,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useTaskStore } from '@/stores/task-store'
 import { useMilestoneStore } from '@/stores/milestone-store'
 import { TaskPriority, TASK_PRIORITY_LABELS } from '@/types/task'
@@ -180,29 +181,35 @@ export function AddTaskDialog({
                         {/* Dependencies */}
                         {tasks.length > 0 && (
                             <div className="grid gap-2">
-                                <Label htmlFor="dependencies">Depends On (Prerequisites)</Label>
-                                <Select
-                                    value={selectedDependencies[0] || "none"}
-                                    onValueChange={(v) => {
-                                        if (v === "none") setSelectedDependencies([])
-                                        else setSelectedDependencies([v])
-                                    }}
-                                    disabled={isSubmitting}
-                                >
-                                    <SelectTrigger id="dependencies">
-                                        <SelectValue placeholder="Select prerequisite task..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none">No Prerequisite</SelectItem>
-                                        {tasks.filter(t => t.status !== 'done').map(t => (
-                                            <SelectItem key={t.id} value={t.id}>
+                                <Label className="text-sm font-semibold">Depends On (Prerequisites)</Label>
+                                <div className="border border-slate-200 rounded-md p-3 max-h-[150px] overflow-y-auto space-y-2 bg-slate-50/50">
+                                    {tasks.filter(t => t.id !== (open ? '' : 'dummy') && t.status !== 'done').map(t => (
+                                        <div key={t.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`dep-${t.id}`}
+                                                checked={selectedDependencies.includes(t.id)}
+                                                onCheckedChange={(checked) => {
+                                                    if (checked) {
+                                                        setSelectedDependencies([...selectedDependencies, t.id])
+                                                    } else {
+                                                        setSelectedDependencies(selectedDependencies.filter(id => id !== t.id))
+                                                    }
+                                                }}
+                                            />
+                                            <Label
+                                                htmlFor={`dep-${t.id}`}
+                                                className="text-xs font-medium text-slate-700 cursor-pointer line-clamp-1"
+                                            >
                                                 {t.title}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                            </Label>
+                                        </div>
+                                    ))}
+                                    {tasks.filter(t => t.status !== 'done').length === 0 && (
+                                        <p className="text-[10px] text-slate-400 italic">No available tasks to depend on.</p>
+                                    )}
+                                </div>
                                 <p className="text-[10px] text-slate-500">
-                                    This task will be locked until the selected prerequisite is completed.
+                                    Selected: {selectedDependencies.length} task{selectedDependencies.length !== 1 ? 's' : ''}. Locked until all selected are done.
                                 </p>
                             </div>
                         )}

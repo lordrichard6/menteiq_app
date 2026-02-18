@@ -250,7 +250,7 @@ export default function InvoicesPage() {
                         <div className="text-center py-12">
                             <p className="text-red-500 mb-2">Error loading invoices</p>
                             <p className="text-sm text-slate-500">{error}</p>
-                            <Button variant="outline" onClick={fetchInvoices} className="mt-4">
+                            <Button variant="outline" onClick={() => fetchInvoices()} className="mt-4">
                                 Retry
                             </Button>
                         </div>

@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
         contact_id: contactId,
         token: sessionToken,
         expires_at: expiresAt.toISOString(),
-        ip_address: request.headers.get('x-forwarded-for') || request.ip,
+        ip_address: request.headers.get('x-forwarded-for') || null,
         user_agent: request.headers.get('user-agent') || null,
       });
 

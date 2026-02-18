@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useChat } from '@ai-sdk/react'
+import { DefaultChatTransport } from 'ai'
 import { useChatStore } from '@/stores/chat-store'
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -43,23 +44,39 @@ export default function ChatPage() {
         }
     }, [activeConversation])
 
-    // Use the Vercel AI SDK's useChat hook for streaming
-    const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat({
-        api: '/api/chat',
-        body: {
-            model: selectedModel,
-            conversationId: activeConversationId,
-        },
-        onFinish: async (message) => {
-            // Save assistant message to Supabase
+    // Use the Vercel AI SDK's useChat hook for streaming.
+    // @ai-sdk/react v3 breaking change: api/body/onFinish moved to transport + ChatInit.
+    // input/handleInputChange/handleSubmit removed — manage input locally, use sendMessage().
+    const [input, setInput] = useState('')
+    const { messages, sendMessage, status, setMessages } = useChat({
+        transport: new DefaultChatTransport({
+            api: '/api/chat',
+            prepareSendMessagesRequest: ({ messages: msgs, ...options }) => ({
+                ...options,
+                messages: msgs,
+                body: {
+                    ...options.body,
+                    model: selectedModel,
+                    conversationId: activeConversationId,
+                },
+            }),
+        }),
+        onFinish: async ({ message }) => {
             if (activeConversationId) {
+                // UIMessage.parts contains text parts; join them to get full content
+                const content = message.parts
+                    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+                    .map(p => p.text)
+                    .join('')
                 await addMessage(activeConversationId, {
                     role: 'assistant',
-                    content: message.content,
+                    content,
                 })
             }
         },
     })
+    const isLoading = status === 'streaming' || status === 'submitted'
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)
 
     // Fetch conversations on mount
     useEffect(() => {
@@ -105,8 +122,11 @@ export default function ChatPage() {
             content: input,
         })
 
-        // Let useChat handle the API call and streaming
-        handleSubmit(e)
+        // Send message via ai-sdk/react v3 sendMessage API and clear input
+        const text = input
+        setInput('')
+        // AI SDK v3: sendMessage uses UIMessage shape — text goes in parts[], not content
+        sendMessage({ role: 'user', parts: [{ type: 'text', text }] })
     }
 
     const handleModelChange = async (newModel: string) => {
@@ -223,7 +243,10 @@ export default function ChatPage() {
                                                         : 'bg-slate-100 text-slate-900'
                                                 )}
                                             >
-                                                {message.content}
+                                                {message.parts
+                                                    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+                                                    .map(p => p.text)
+                                                    .join('')}
                                             </div>
                                         </div>
                                     ))}

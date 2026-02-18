@@ -24,11 +24,11 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
     // Calculate stats
     const stats = useMemo(() => {
         const contactInvoices = invoices.filter(inv => inv.contact_id === contact.id)
-        const contactProjects = projects.filter(proj => proj.contact_id === contact.id)
+        const contactProjects = projects.filter(proj => proj.clientId === contact.id)
 
         const totalRevenue = contactInvoices
             .filter(inv => inv.status === 'paid')
-            .reduce((sum, inv) => sum + inv.total, 0)
+            .reduce((sum, inv) => sum + inv.amount_total, 0)
 
         const openInvoices = contactInvoices.filter(inv =>
             inv.status === 'sent' || inv.status === 'overdue'

@@ -30,7 +30,7 @@ interface ConsentHistoryEntry {
 
 export function ConsentManagement({ contactId, currentConsent }: ConsentManagementProps) {
     const [marketingConsent, setMarketingConsent] = useState(currentConsent?.marketing_consent || false)
-    const [dataProcessingConsent, setDataProcessingConsent] = useState(currentConsent?.data_processing_consent || true)
+    const [dataProcessingConsent, setDataProcessingConsent] = useState<boolean>(currentConsent?.data_processing_consent ?? true)
     const [isSaving, setIsSaving] = useState(false)
     const [showHistory, setShowHistory] = useState(false)
     const [consentHistory, setConsentHistory] = useState<ConsentHistoryEntry[]>([])

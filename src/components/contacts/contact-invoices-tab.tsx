@@ -18,6 +18,7 @@ const STATUS_COLORS = {
     sent: 'bg-blue-100 text-blue-700',
     paid: 'bg-green-100 text-green-700',
     overdue: 'bg-red-100 text-red-700',
+    cancelled: 'bg-slate-100 text-slate-500',
 }
 
 const STATUS_LABELS = {
@@ -25,6 +26,7 @@ const STATUS_LABELS = {
     sent: 'Sent',
     paid: 'Paid',
     overdue: 'Overdue',
+    cancelled: 'Cancelled',
 }
 
 export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
@@ -41,7 +43,7 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
     const totalRevenue = useMemo(() => {
         return contactInvoices
             .filter(inv => inv.status === 'paid')
-            .reduce((sum, inv) => sum + inv.total, 0)
+            .reduce((sum, inv) => sum + inv.amount_total, 0)
     }, [contactInvoices])
 
     return (
@@ -129,7 +131,7 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                                                 <Calendar className="h-3 w-3" />
                                                 {invoice.status === 'paid'
                                                     ? `Paid: ${new Date(invoice.paid_at || '').toLocaleDateString('de-CH')}`
-                                                    : `Due: ${new Date(invoice.due_date).toLocaleDateString('de-CH')}`
+                                                    : `Due: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('de-CH') : 'N/A'}`
                                                 }
                                             </div>
                                         </div>
@@ -137,7 +139,7 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                                     <div className="flex items-center gap-4">
                                         <div className="text-right">
                                             <div className="font-semibold text-[#3D4A67]">
-                                                CHF {invoice.total.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
+                                                CHF {invoice.amount_total.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
                                             </div>
                                             <Badge className={STATUS_COLORS[invoice.status]}>
                                                 {STATUS_LABELS[invoice.status]}

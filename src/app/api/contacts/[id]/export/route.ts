@@ -10,11 +10,11 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function GET(
     request: NextRequest,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         const supabase = await createClient()
-        const contactId = params.id
+        const { id: contactId } = await params
 
         // Get query params
         const searchParams = request.nextUrl.searchParams

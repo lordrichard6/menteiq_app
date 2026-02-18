@@ -40,6 +40,9 @@ const securityHeaders = [
 
 const nextConfig = {
   reactCompiler: true,
+  // pdf-parse v1 tries to read a test file at module load time; exclude from bundling
+  // so Node.js resolves it natively (where the test file check is skipped in production)
+  serverExternalPackages: ['pdf-parse'],
   experimental: {
     serverActions: {
       bodySizeLimit: '2mb',

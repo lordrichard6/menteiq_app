@@ -41,7 +41,7 @@ export function CreateInvoiceDialog({
 }: CreateInvoiceDialogProps) {
     const [open, setOpen] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [invoiceType, setInvoiceType] = useState<InvoiceType>('standard')
+    const [invoiceType, setInvoiceType] = useState<InvoiceType>('swiss_qr')
     const [currency, setCurrency] = useState('CHF')
     const [dueDate, setDueDate] = useState('')
     const [notes, setNotes] = useState('')
@@ -84,7 +84,7 @@ export function CreateInvoiceDialog({
             })
             setOpen(false)
             // Reset form
-            setInvoiceType('standard')
+            setInvoiceType('swiss_qr')
             setCurrency('CHF')
             setDueDate('')
             setNotes('')
@@ -119,8 +119,8 @@ export function CreateInvoiceDialog({
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="standard">Standard</SelectItem>
                                     <SelectItem value="swiss_qr">Swiss QR</SelectItem>
+                                    <SelectItem value="eu_sepa">EU SEPA</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
