@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
-import { Mail, Lock, ArrowRight } from 'lucide-react'
+import Image from "next/image"
+import { Mail, Lock, ArrowRight, ShieldCheck, MapPin, Globe } from 'lucide-react'
 import { login, signInWithGoogle } from "../actions"
 import { useActionState } from "react"
 
@@ -23,7 +24,13 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 px-4 py-8">
+
+            {/* Logo */}
+            <div className="mb-6 flex flex-col items-center gap-2">
+                <Image src="/menteiq_logo.svg" alt="MenteIQ" width={120} height={32} priority />
+            </div>
+
             <Card className="w-full max-w-md border-slate-200 bg-white shadow-lg">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl text-[#3D4A67]">Welcome back</CardTitle>
@@ -107,6 +114,36 @@ export default function LoginPage() {
                     </p>
                 </CardContent>
             </Card>
+
+            {/* Trust badges */}
+            <div className="mt-6 flex flex-col items-center gap-3">
+                <div className="flex items-center gap-2 rounded-full bg-white border border-slate-200 px-4 py-1.5 shadow-sm">
+                    <span className="text-base">🇨🇭</span>
+                    <span className="text-xs font-semibold text-slate-600 tracking-wide">Swiss-Made Software</span>
+                </div>
+                <div className="flex flex-wrap justify-center gap-2 text-xs text-slate-500">
+                    <span className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2.5 py-1">
+                        <ShieldCheck className="h-3 w-3 text-[#9EAE8E]" /> GDPR Compliant
+                    </span>
+                    <span className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2.5 py-1">
+                        <ShieldCheck className="h-3 w-3 text-[#9EAE8E]" /> nDSG Compliant
+                    </span>
+                    <span className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2.5 py-1">
+                        <MapPin className="h-3 w-3 text-[#9EAE8E]" /> EU Data Residency
+                    </span>
+                    <span className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2.5 py-1">
+                        <Globe className="h-3 w-3 text-[#9EAE8E]" /> Built for Europe
+                    </span>
+                </div>
+                <p className="text-xs text-slate-400 text-center">
+                    MenteIQ is a product of{' '}
+                    <a href="https://lopes2tech.com" target="_blank" rel="noopener noreferrer" className="hover:text-slate-600 underline underline-offset-2">
+                        Lopes2tech
+                    </a>
+                    {' '}· © 2026 All rights reserved
+                </p>
+            </div>
+
         </div>
     )
 }
