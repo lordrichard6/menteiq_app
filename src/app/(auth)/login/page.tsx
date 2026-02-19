@@ -129,7 +129,7 @@ export default function LoginPage() {
                         <ShieldCheck className="h-3 w-3 text-[#9EAE8E]" /> nDSG Compliant
                     </span>
                     <span className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2.5 py-1">
-                        <MapPin className="h-3 w-3 text-[#9EAE8E]" /> EU Data Residency
+                        🇨🇭 Data Stored in Switzerland
                     </span>
                     <span className="flex items-center gap-1 bg-white border border-slate-200 rounded-full px-2.5 py-1">
                         <Globe className="h-3 w-3 text-[#9EAE8E]" /> Built for Europe
