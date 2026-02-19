@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { DefaultChatTransport, type FileUIPart } from 'ai'
 import { useChatStore } from '@/stores/chat-store'
+import { createClient } from '@/lib/supabase/client'
+import { type SubscriptionTier } from '@/lib/pricing'
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,8 +18,39 @@ import {
 } from "@/components/ui/select"
 import { AVAILABLE_MODELS } from '@/types/chat'
 import { cn } from '@/lib/utils'
-import { Plus, Send, Bot, X, MessageSquare, Loader2 } from 'lucide-react'
+import { Plus, Send, Bot, X, MessageSquare, Loader2, Paperclip, FileText } from 'lucide-react'
 import { TokenUsageMeter } from '@/components/token-usage-meter'
+import { ChatFileAttachment, type AttachedFile } from '@/components/chat/chat-file-attachment'
+
+// ── File attachment constants ──────────────────────────────────────────────────
+const ALLOWED_MEDIA_TYPES = new Set([
+    'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf',
+])
+const PDF_MEDIA_TYPE = 'application/pdf'
+const MAX_FILE_SIZE  = 5 * 1024 * 1024   // 5 MB
+const MAX_FILES      = 3
+
+// ── Lightweight hook: fetch the org's subscription tier ───────────────────────
+function useOrgTier() {
+    const [tier, setTier] = useState<SubscriptionTier>('free')
+
+    useEffect(() => {
+        const supabase = createClient()
+        async function load() {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+            const { data: profile } = await supabase
+                .from('profiles').select('tenant_id').eq('id', user.id).single()
+            if (!profile?.tenant_id) return
+            const { data: org } = await supabase
+                .from('organizations').select('subscription_tier').eq('id', profile.tenant_id).single()
+            if (org?.subscription_tier) setTier(org.subscription_tier as SubscriptionTier)
+        }
+        load()
+    }, [])
+
+    return tier
+}
 
 export default function ChatPage() {
     const {
@@ -35,8 +68,20 @@ export default function ChatPage() {
 
     const [selectedModel, setSelectedModel] = useState('gpt-4o-mini')
     const messagesEndRef = useRef<HTMLDivElement>(null)
+    const fileInputRef   = useRef<HTMLInputElement>(null)
 
     const activeConversation = activeConversationId ? getConversation(activeConversationId) : null
+    const orgTier = useOrgTier()
+
+    // ── File attachment state ──────────────────────────────────────────────────
+    const [attachments, setAttachments] = useState<AttachedFile[]>([])
+    const [fileError, setFileError]     = useState<string | null>(null)
+
+    // Cleanup object URLs on unmount
+    useEffect(() => {
+        return () => { attachments.forEach(a => URL.revokeObjectURL(a.url)) }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // Sync selected model with active conversation
     useEffect(() => {
@@ -46,7 +91,7 @@ export default function ChatPage() {
     }, [activeConversation])
 
     // Use the Vercel AI SDK's useChat hook for streaming.
-    // @ai-sdk/react v3 breaking change: api/body/onFinish moved to transport + ChatInit.
+    // @ai-sdk/react v3: api/body/onFinish moved to transport + ChatInit.
     // input/handleInputChange/handleSubmit removed — manage input locally, use sendMessage().
     const [input, setInput] = useState('')
     const { messages, sendMessage, status, setMessages } = useChat({
@@ -64,20 +109,15 @@ export default function ChatPage() {
         }),
         onFinish: async ({ message }) => {
             if (activeConversationId) {
-                // UIMessage.parts contains text parts; join them to get full content
                 const content = message.parts
                     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
                     .map(p => p.text)
                     .join('')
-                await addMessage(activeConversationId, {
-                    role: 'assistant',
-                    content,
-                })
+                await addMessage(activeConversationId, { role: 'assistant', content })
             }
         },
     })
     const isLoading = status === 'streaming' || status === 'submitted'
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => setInput(e.target.value)
 
     // Fetch conversations on mount
     useEffect(() => {
@@ -98,17 +138,84 @@ export default function ChatPage() {
         }
     }, [activeConversationId, setMessages])
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    }
-
     useEffect(() => {
-        scrollToBottom()
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
     }, [messages])
+
+    // ── File handling ──────────────────────────────────────────────────────────
+
+    const handleFiles = useCallback((incoming: FileList | File[]) => {
+        setFileError(null)
+        const candidates = Array.from(incoming)
+        const rejected: string[] = []
+
+        const valid = candidates.filter(f => {
+            if (!ALLOWED_MEDIA_TYPES.has(f.type)) {
+                rejected.push(`${f.name}: unsupported format`)
+                return false
+            }
+            if (f.type === PDF_MEDIA_TYPE && orgTier === 'free') {
+                rejected.push(`${f.name}: PDF requires Pro plan`)
+                return false
+            }
+            if (f.size > MAX_FILE_SIZE) {
+                rejected.push(`${f.name}: exceeds 5 MB limit`)
+                return false
+            }
+            return true
+        })
+
+        if (rejected.length > 0) setFileError(rejected.join(' · '))
+
+        if (valid.length === 0) return
+
+        const newItems: AttachedFile[] = valid.map(file => ({
+            id: crypto.randomUUID(),
+            file,
+            url: URL.createObjectURL(file),
+            mediaType: file.type,
+            filename: file.name,
+        }))
+
+        setAttachments(prev => {
+            const combined = [...prev, ...newItems]
+            // Revoke URLs for anything beyond the cap
+            combined.slice(MAX_FILES).forEach(a => URL.revokeObjectURL(a.url))
+            return combined.slice(0, MAX_FILES)
+        })
+    }, [orgTier])
+
+    const handlePaste = useCallback((e: React.ClipboardEvent) => {
+        const images: File[] = []
+        // Check .files first (screenshot paste)
+        Array.from(e.clipboardData.files)
+            .filter(f => f.type.startsWith('image/'))
+            .forEach(f => images.push(f))
+        // Fallback: .items (right-click-copy from browser)
+        if (images.length === 0) {
+            Array.from(e.clipboardData.items)
+                .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+                .forEach(item => { const f = item.getAsFile(); if (f) images.push(f) })
+        }
+        if (images.length > 0) {
+            e.preventDefault()
+            handleFiles(images)
+        }
+    }, [handleFiles])
+
+    const removeAttachment = useCallback((id: string) => {
+        setAttachments(prev => {
+            const removed = prev.find(a => a.id === id)
+            if (removed) URL.revokeObjectURL(removed.url)
+            return prev.filter(a => a.id !== id)
+        })
+    }, [])
+
+    // ── Submit ─────────────────────────────────────────────────────────────────
 
     const handleChatSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!input.trim() || isLoading) return
+        if ((!input.trim() && attachments.length === 0) || isLoading) return
 
         let conversationId = activeConversationId
         if (!conversationId) {
@@ -117,17 +224,39 @@ export default function ChatPage() {
             conversationId = newConv.id
         }
 
-        // Save user message to Supabase
-        await addMessage(conversationId, {
-            role: 'user',
-            content: input,
-        })
+        // DB-safe content — never store base64 in Supabase
+        const dbContent = attachments.length > 0
+            ? `${input}${input ? '\n' : ''}[${attachments.length} file(s) attached]`
+            : input
 
-        // Send message via ai-sdk/react v3 sendMessage API and clear input
+        await addMessage(conversationId, { role: 'user', content: dbContent })
+
+        // Encode attachments as data URLs (chunked btoa avoids stack overflow on large files)
+        const fileParts: FileUIPart[] = await Promise.all(
+            attachments.map(async ({ file, mediaType, filename }) => {
+                const bytes = new Uint8Array(await file.arrayBuffer())
+                const CHUNK = 0x8000
+                let binary = ''
+                for (let i = 0; i < bytes.length; i += CHUNK)
+                    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
+                return {
+                    type: 'file' as const,
+                    mediaType,
+                    filename,
+                    url: `data:${mediaType};base64,${btoa(binary)}`,
+                }
+            })
+        )
+
+        // Clear state before sending
         const text = input
         setInput('')
-        // AI SDK v3: sendMessage uses UIMessage shape — text goes in parts[], not content
-        sendMessage({ role: 'user', parts: [{ type: 'text', text }] })
+        setFileError(null)
+        attachments.forEach(a => URL.revokeObjectURL(a.url))
+        setAttachments([])
+
+        // AI SDK v3: sendMessage with optional files array
+        sendMessage({ text, files: fileParts.length > 0 ? fileParts : undefined })
     }
 
     const handleModelChange = async (newModel: string) => {
@@ -249,6 +378,27 @@ export default function ChatPage() {
                                                         : 'bg-slate-100 text-slate-900'
                                                 )}
                                             >
+                                                {/* File attachments — rendered above the text */}
+                                                {message.parts
+                                                    .filter((p): p is FileUIPart => p.type === 'file')
+                                                    .map((p, i) =>
+                                                        p.mediaType?.startsWith('image/') ? (
+                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                            <img
+                                                                key={i}
+                                                                src={p.url}
+                                                                alt={p.filename || 'attached image'}
+                                                                className="max-w-xs max-h-48 rounded mb-2 object-contain block"
+                                                            />
+                                                        ) : (
+                                                            <div key={i} className="flex items-center gap-1.5 text-xs mb-2 opacity-80">
+                                                                <FileText className="h-4 w-4 flex-shrink-0" />
+                                                                <span className="truncate">{p.filename || 'PDF attached'}</span>
+                                                            </div>
+                                                        )
+                                                    )
+                                                }
+                                                {/* Text content */}
                                                 {message.parts
                                                     .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
                                                     .map(p => p.text)
@@ -289,22 +439,74 @@ export default function ChatPage() {
                     </Card>
 
                     {/* Input Area */}
-                    <form onSubmit={handleChatSubmit} className="mt-4 flex gap-2">
-                        <Input
-                            placeholder="Type your message... (Try: 'Help me draft an email' or 'Summarize my contacts')"
-                            value={input}
-                            onChange={handleInputChange}
-                            disabled={isLoading}
-                            className="flex-1 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
-                        />
-                        <Button
-                            type="submit"
-                            className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white"
-                            disabled={isLoading || !input.trim()}
-                        >
-                            <Send className="h-4 w-4" />
-                        </Button>
-                    </form>
+                    <div className="mt-4">
+                        {/* Attachment preview strip */}
+                        {attachments.length > 0 && (
+                            <div className="flex gap-2 flex-wrap mb-2 px-1">
+                                {attachments.map(att => (
+                                    <ChatFileAttachment
+                                        key={att.id}
+                                        attachment={att}
+                                        onRemove={removeAttachment}
+                                    />
+                                ))}
+                            </div>
+                        )}
+
+                        {/* File error */}
+                        {fileError && (
+                            <p className="text-xs text-red-500 mb-1.5 px-1">{fileError}</p>
+                        )}
+
+                        <form onSubmit={handleChatSubmit} className="flex gap-2">
+                            {/* Hidden file input */}
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                className="hidden"
+                                multiple
+                                accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                                onChange={(e) => {
+                                    if (e.target.files) handleFiles(e.target.files)
+                                    e.target.value = ''   // reset so same file can be picked again
+                                }}
+                            />
+
+                            {/* Paperclip button */}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                disabled={isLoading || !activeConversation || attachments.length >= MAX_FILES}
+                                onClick={() => fileInputRef.current?.click()}
+                                title={
+                                    orgTier === 'free'
+                                        ? 'Attach image (PDF requires Pro)'
+                                        : 'Attach image or PDF (max 5 MB)'
+                                }
+                                className="flex-shrink-0"
+                            >
+                                <Paperclip className="h-4 w-4" />
+                            </Button>
+
+                            <Input
+                                placeholder="Type your message… or paste a screenshot"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onPaste={handlePaste}
+                                disabled={isLoading}
+                                className="flex-1 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                            />
+
+                            <Button
+                                type="submit"
+                                className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white flex-shrink-0"
+                                disabled={isLoading || (!input.trim() && attachments.length === 0)}
+                            >
+                                <Send className="h-4 w-4" />
+                            </Button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

@@ -1,5 +1,5 @@
 
-import { streamText } from 'ai';
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { google } from '@ai-sdk/google';
@@ -113,9 +113,12 @@ export async function POST(req: Request) {
 
     const aiModel = getModel(selectedModel);
 
+    // Convert UIMessage[] → ModelMessage[] so file/image parts are forwarded to the model
+    const modelMessages = await convertToModelMessages(messages as UIMessage[]);
+
     const result = await streamText({
         model: aiModel,
-        messages,
+        messages: modelMessages,
         tools: {
             search_documents: {
                 description: 'Search for documents in the vault based on query',
@@ -133,6 +136,7 @@ export async function POST(req: Request) {
 Current User Role: ${role}.
 
 You help users manage their CRM, draft emails, create tasks, analyse contacts, and find information.
+The user may share images (screenshots, charts, documents) or PDF files directly in the chat — analyse and describe what you see when they do.
 
 You have access to tools:
 - Always use 'search_documents' if the user asks about files, contracts, or specific client info.
@@ -177,5 +181,5 @@ Be concise, professional, and helpful.`,
         },
     });
 
-    return (result as any).toDataStreamResponse();
+    return result.toUIMessageStreamResponse();
 }

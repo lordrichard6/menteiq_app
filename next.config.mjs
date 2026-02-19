@@ -44,8 +44,9 @@ const nextConfig = {
   // so Node.js resolves it natively (where the test file check is skipped in production)
   serverExternalPackages: ['pdf-parse'],
   experimental: {
+    // Chat file uploads: up to 3 × 5 MB files → ~20 MB base64-encoded body
     serverActions: {
-      bodySizeLimit: '2mb',
+      bodySizeLimit: '25mb',
     },
   },
   async headers() {
