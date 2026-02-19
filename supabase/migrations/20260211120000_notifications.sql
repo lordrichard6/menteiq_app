@@ -76,7 +76,7 @@ CREATE POLICY notifications_insert_policy ON public.notifications
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS public.notification_preferences (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE NOT NULL UNIQUE,
 
   -- In-app notification preferences

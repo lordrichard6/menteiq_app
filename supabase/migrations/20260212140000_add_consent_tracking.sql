@@ -23,7 +23,7 @@ ALTER TABLE contacts
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS consent_history (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid REFERENCES organizations(id) ON DELETE CASCADE NOT NULL,
   contact_id uuid REFERENCES contacts(id) ON DELETE CASCADE NOT NULL,
 

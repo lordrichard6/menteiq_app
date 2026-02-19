@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS contacts_portal_token_idx ON contacts(portal_token)
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS portal_sessions (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   contact_id uuid REFERENCES contacts(id) ON DELETE CASCADE NOT NULL,
   token text UNIQUE NOT NULL,
 

@@ -39,7 +39,7 @@ USING (
         JOIN public.profiles prof ON prof.tenant_id = p.tenant_id
         WHERE p.id = project_members.project_id
         AND prof.id = auth.uid()
-        AND prof.role IN ('owner', 'admin')
+        AND prof.role IN ('owner')
     )
 );
 

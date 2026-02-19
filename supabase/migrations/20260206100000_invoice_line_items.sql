@@ -33,7 +33,7 @@ ALTER TABLE invoices
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS invoice_line_items (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_id uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
   description text NOT NULL,
   quantity numeric(10,2) NOT NULL DEFAULT 1,

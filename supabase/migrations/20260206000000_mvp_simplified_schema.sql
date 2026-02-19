@@ -166,7 +166,7 @@ CREATE TYPE task_status AS ENUM ('todo', 'in_progress', 'done');
 CREATE TYPE task_priority AS ENUM ('low', 'medium', 'high', 'urgent');
 
 CREATE TABLE IF NOT EXISTS tasks (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid REFERENCES organizations(id) NOT NULL,
   contact_id uuid REFERENCES contacts(id) ON DELETE SET NULL,
   project_id uuid REFERENCES projects(id) ON DELETE SET NULL,
@@ -190,7 +190,7 @@ ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS ai_conversations (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid REFERENCES organizations(id) NOT NULL,
   user_id uuid REFERENCES profiles(id) NOT NULL,
   contact_id uuid REFERENCES contacts(id) ON DELETE SET NULL,
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS ai_conversations (
 );
 
 CREATE TABLE IF NOT EXISTS ai_messages (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   conversation_id uuid REFERENCES ai_conversations(id) ON DELETE CASCADE NOT NULL,
   
   role text NOT NULL, -- 'user' | 'assistant' | 'system'
@@ -225,7 +225,7 @@ ALTER TABLE ai_messages ENABLE ROW LEVEL SECURITY;
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS document_chunks (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id uuid REFERENCES documents(id) ON DELETE CASCADE NOT NULL,
   
   chunk_index integer NOT NULL,
@@ -253,7 +253,7 @@ ALTER TABLE document_chunks ENABLE ROW LEVEL SECURITY;
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS usage_logs (
-  id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid REFERENCES organizations(id) NOT NULL,
   user_id uuid REFERENCES profiles(id) NOT NULL,
   

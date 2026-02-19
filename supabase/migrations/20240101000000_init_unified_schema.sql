@@ -31,7 +31,7 @@ create extension if not exists "uuid-ossp";
 
 -- TENANTS (The Service Provider, e.g., "Ribeiro Consulting")
 create table tenants (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   name text not null,
   slug text unique not null,
   settings jsonb default '{}'::jsonb, -- Branding, specific config
@@ -57,7 +57,7 @@ create table profiles (
 -- Can be human OR organization. 
 -- Centralized generic 'company_uid' for Zefix/NIF.
 create table contacts (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) not null,
   
   is_company boolean default false,
@@ -86,7 +86,7 @@ create table contacts (
 create type project_status as enum ('lead', 'active', 'on_hold', 'completed', 'archived');
 
 create table projects (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) not null,
   contact_id uuid references contacts(id) on delete cascade,
   
@@ -105,7 +105,7 @@ create table projects (
 create type doc_visibility as enum ('internal', 'shared');
 
 create table documents (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) not null,
   project_id uuid references projects(id),
   contact_id uuid references contacts(id),
@@ -126,7 +126,7 @@ create table documents (
 
 -- BOOKINGS (Sync Placeholder)
 create table bookings (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) not null,
   project_id uuid references projects(id),
   contact_id uuid references contacts(id),
@@ -146,7 +146,7 @@ create table bookings (
 create type invoice_status as enum ('draft', 'sent', 'paid', 'overdue', 'cancelled');
 
 create table invoices (
-  id uuid primary key default uuid_generate_v4(),
+  id uuid primary key default gen_random_uuid(),
   tenant_id uuid references tenants(id) not null,
   project_id uuid references projects(id),
   contact_id uuid references contacts(id),
