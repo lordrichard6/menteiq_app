@@ -138,7 +138,7 @@ export const tiers: Record<SubscriptionTier, TierConfig> = {
     availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'claude-opus-4', 'gemini-pro'],
     maxPacks: -1,
     ctaLabel: 'Contact Sales',
-    ctaHref: 'mailto:sales@menteiq.ch',
+    ctaHref: 'mailto:paulo@menteiq.ch',
     features: [
       'Everything in Business',
       '500,000 AI tokens / month',

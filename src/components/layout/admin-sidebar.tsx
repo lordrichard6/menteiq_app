@@ -1,6 +1,7 @@
 'use client';
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -44,7 +45,7 @@ export function AdminSidebar() {
     const NavContent = () => (
         <div className="flex flex-col h-full">
             <div className="mb-8 pl-4">
-                <h1 className="text-xl font-bold text-white">MenteIQ</h1>
+                <Image src="/menteiq_logo_white.svg" alt="MenteIQ" width={100} height={32} priority />
             </div>
             <nav className="space-y-1 flex-1">
                 <Link href="/dashboard"
@@ -87,7 +88,14 @@ export function AdminSidebar() {
                 <div className="flex flex-col h-full w-64">
                     {/* Fixed width container inside to prevent text squashing during transition */}
                     <div className="mb-8 pl-6 h-16 flex items-center">
-                        <h1 className="text-xl font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">MenteIQ</h1>
+                        <Image
+                            src="/menteiq_logo_white.svg"
+                            alt="MenteIQ"
+                            width={110}
+                            height={36}
+                            priority
+                            className="opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        />
                     </div>
                     <nav className="space-y-1 flex-1 px-3">
                         <Link href="/dashboard"
@@ -136,7 +144,7 @@ export function AdminSidebar() {
                         <NavContent />
                     </DialogContent>
                 </Dialog>
-                <span className="ml-4 font-bold text-white">MenteIQ</span>
+                <Image src="/menteiq_logo_white.svg" alt="MenteIQ" width={90} height={28} priority className="ml-4" />
             </div>
         </>
     );

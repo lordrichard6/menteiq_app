@@ -24,7 +24,7 @@ export default function PrivacyPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">2. Use of Data</h2>
                         <p className="text-slate-600 mb-4">
-                            MenteIQ uses the collected data for various purposes:
+                            MenteIQ (a product of Lopes2tech) uses the collected data for various purposes:
                         </p>
                         <ul className="list-disc pl-5 text-slate-600 space-y-2">
                             <li>To provide and maintain the Service</li>
@@ -40,7 +40,7 @@ export default function PrivacyPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">3. Data Retention</h2>
                         <p className="text-slate-600 mb-4">
-                            MenteIQ will retain your Personal Data only for as long as is necessary for the purposes set out in this Privacy Policy. We will retain and use your Personal Data to the extent necessary to comply with our legal obligations (for example, if we are required to retain your data to comply with applicable laws), resolve disputes, and enforce our legal agreements and policies.
+                            MenteIQ / Lopes2tech will retain your Personal Data only for as long as is necessary for the purposes set out in this Privacy Policy. We will retain and use your Personal Data to the extent necessary to comply with our legal obligations (for example, if we are required to retain your data to comply with applicable laws), resolve disputes, and enforce our legal agreements and policies.
                         </p>
                     </section>
 
@@ -61,7 +61,7 @@ export default function PrivacyPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">6. Contact Us</h2>
                         <p className="text-slate-600 mb-4">
-                            If you have any questions about this Privacy Policy, please contact us at privacy@menteiq.ch.
+                            If you have any questions about this Privacy Policy, please contact us at paulo@menteiq.ch.
                         </p>
                     </section>
                 </div>

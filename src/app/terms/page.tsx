@@ -17,7 +17,7 @@ export default function TermsPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">1. Acceptance of Terms</h2>
                         <p className="text-slate-600 mb-4">
-                            By accessing and using MenteIQ ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.
+                            By accessing and using MenteIQ ("the Service"), a product of Lopes2tech, you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.
                         </p>
                     </section>
 
@@ -38,7 +38,7 @@ export default function TermsPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">4. Intellectual Property</h2>
                         <p className="text-slate-600 mb-4">
-                            The Service and its original content, features, and functionality are and will remain the exclusive property of MenteIQ and its licensors. The Service is protected by copyright, trademark, and other laws of both the United States and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of MenteIQ.
+                            The Service and its original content, features, and functionality are and will remain the exclusive property of Lopes2tech and its licensors. MenteIQ is a product of Lopes2tech. The Service is protected by copyright, trademark, and other laws of both the United States and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of MenteIQ.
                         </p>
                     </section>
 
@@ -52,7 +52,7 @@ export default function TermsPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">6. Contact Us</h2>
                         <p className="text-slate-600 mb-4">
-                            If you have any questions about these Terms, please contact us at legal@menteiq.ch.
+                            If you have any questions about these Terms, please contact us at paulo@menteiq.ch.
                         </p>
                     </section>
                 </div>

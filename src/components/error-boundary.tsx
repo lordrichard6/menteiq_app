@@ -130,10 +130,10 @@ export class ErrorBoundary extends Component<Props, State> {
                                 <p className="text-xs text-slate-500 mt-6">
                                     If this problem persists, please contact{' '}
                                     <a
-                                        href="mailto:support@menteiq.ch"
+                                        href="mailto:paulo@menteiq.ch"
                                         className="text-blue-600 hover:underline"
                                     >
-                                        support@menteiq.ch
+                                        paulo@menteiq.ch
                                     </a>
                                 </p>
                             </div>
