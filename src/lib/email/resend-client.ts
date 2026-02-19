@@ -17,7 +17,7 @@ function getResend(): Resend {
 const resend = { get emails() { return getResend().emails; } } as Resend;
 
 // Default sender email (you'll need to verify this domain in Resend)
-const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'OrbitCRM <noreply@orbitcrm.app>';
+const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'MenteIQ <noreply@menteiq.ch>';
 
 export interface SendEmailOptions {
   to: string | string[];

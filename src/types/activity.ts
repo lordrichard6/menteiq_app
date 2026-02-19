@@ -1,4 +1,4 @@
-// Activity log types for OrbitCRM
+// Activity log types for MenteIQ
 
 export type ActivityEventType =
     | 'created'

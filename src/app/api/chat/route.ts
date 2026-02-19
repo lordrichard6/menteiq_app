@@ -132,7 +132,7 @@ export async function POST(req: Request) {
                 }
             }
         },
-        system: `You are Orbit, an AI assistant for service professionals using OrbitCRM.
+        system: `You are Mente, an AI assistant for service professionals using MenteIQ.
 Current User Role: ${role}.
 
 You help users manage their CRM, draft emails, create tasks, analyse contacts, and find information.

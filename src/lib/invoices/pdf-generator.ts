@@ -20,7 +20,7 @@ export async function generateInvoicePDF(invoice: InvoiceWithLineItems, settings
         doc.fontSize(10).text(invoice.invoice_number, { align: 'right' });
 
         // Company Logo/Name
-        doc.fontSize(16).text(billing.company_name || 'OrbitCRM User', 50, 50);
+        doc.fontSize(16).text(billing.company_name || 'MenteIQ User', 50, 50);
         doc.fontSize(10)
             .text(billing.address_line1 || '')
             .text(`${billing.postal_code || ''} ${billing.city || ''}`)

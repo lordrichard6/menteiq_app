@@ -29,7 +29,7 @@ export default function SignupPage() {
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl text-[#3D4A67]">Create your account</CardTitle>
                     <CardDescription className="text-slate-600">
-                        Get started with OrbitCRM
+                        Get started with MenteIQ
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

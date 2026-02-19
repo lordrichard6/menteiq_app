@@ -14,7 +14,7 @@ const links = [
     { href: "/invoices", icon: Receipt, label: "Invoices" },
     { href: "/tasks", icon: CheckSquare, label: "Tasks" },
     { href: "/documents", icon: FileText, label: "Vault" },
-    { href: "/chat", icon: MessageSquare, label: "Orbit AI" },
+    { href: "/chat", icon: MessageSquare, label: "Mente AI" },
 ];
 
 export function AdminSidebar() {
@@ -29,10 +29,10 @@ export function AdminSidebar() {
             const supabase = createClient();
             await supabase.auth.signOut();
             // Clear any localStorage data
-            localStorage.removeItem('orbitcrm-contacts');
-            localStorage.removeItem('orbitcrm-projects');
-            localStorage.removeItem('orbitcrm-tasks');
-            localStorage.removeItem('orbitcrm-chat');
+            localStorage.removeItem('menteiq-contacts');
+            localStorage.removeItem('menteiq-projects');
+            localStorage.removeItem('menteiq-tasks');
+            localStorage.removeItem('menteiq-chat');
             router.push('/login');
             router.refresh();
         } catch (error) {
@@ -44,7 +44,7 @@ export function AdminSidebar() {
     const NavContent = () => (
         <div className="flex flex-col h-full">
             <div className="mb-8 pl-4">
-                <h1 className="text-xl font-bold text-white">OrbitCRM</h1>
+                <h1 className="text-xl font-bold text-white">MenteIQ</h1>
             </div>
             <nav className="space-y-1 flex-1">
                 <Link href="/dashboard"
@@ -67,8 +67,8 @@ export function AdminSidebar() {
                     <Settings className="h-5 w-5" />
                     Settings
                 </Link>
-                <Button 
-                    variant="ghost" 
+                <Button
+                    variant="ghost"
                     onClick={handleLogout}
                     disabled={isLoggingOut}
                     className="w-full justify-start gap-3 text-white/80 hover:bg-white/10 hover:text-white"
@@ -87,7 +87,7 @@ export function AdminSidebar() {
                 <div className="flex flex-col h-full w-64">
                     {/* Fixed width container inside to prevent text squashing during transition */}
                     <div className="mb-8 pl-6 h-16 flex items-center">
-                        <h1 className="text-xl font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">OrbitCRM</h1>
+                        <h1 className="text-xl font-bold text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300">MenteIQ</h1>
                     </div>
                     <nav className="space-y-1 flex-1 px-3">
                         <Link href="/dashboard"
@@ -108,8 +108,8 @@ export function AdminSidebar() {
                             <Settings className="h-6 w-6 min-w-[24px]" />
                             <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 whitespace-nowrap">Settings</span>
                         </Link>
-                        <Button 
-                            variant="ghost" 
+                        <Button
+                            variant="ghost"
                             onClick={handleLogout}
                             disabled={isLoggingOut}
                             className="w-full justify-start gap-4 px-3 py-3 h-auto text-white/80 hover:bg-white/10 hover:text-white"
@@ -136,7 +136,7 @@ export function AdminSidebar() {
                         <NavContent />
                     </DialogContent>
                 </Dialog>
-                <span className="ml-4 font-bold text-white">OrbitCRM</span>
+                <span className="ml-4 font-bold text-white">MenteIQ</span>
             </div>
         </>
     );

@@ -26,7 +26,7 @@ interface ParsedData {
   fileType: 'csv' | 'xlsx' | 'vcf'
 }
 
-// OrbitCRM field definitions
+// MenteIQ field definitions
 const ORBITCRM_FIELDS = [
   { value: 'firstName', label: 'First Name', required: true },
   { value: 'lastName', label: 'Last Name', required: false },
@@ -390,7 +390,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
             <div>
               <h3 className="text-lg font-medium mb-2">Map Your Columns</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Match your file's columns to OrbitCRM fields. Required fields: First Name and Email
+                Match your file's columns to MenteIQ fields. Required fields: First Name and Email
               </p>
 
               <div className="border rounded-lg overflow-x-auto w-full">

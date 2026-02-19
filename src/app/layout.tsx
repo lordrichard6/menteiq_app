@@ -16,18 +16,18 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "OrbitCRM — AI-Powered CRM for European Service Professionals",
-    template: "%s | OrbitCRM",
+    default: "MenteIQ — Swiss-Made AI Business OS for Service Professionals",
+    template: "%s | MenteIQ",
   },
   description:
-    "OrbitCRM is an AI-native CRM, invoicing, and knowledge base built for European service professionals. Swiss QR-Bill, GDPR compliant, EU VAT ready.",
+    "MenteIQ is a Swiss-made AI-native business OS: CRM, invoicing, and knowledge base built for service professionals worldwide. Swiss QR-Bill, GDPR compliant, EU VAT ready.",
   keywords: [
     "CRM", "AI CRM", "Swiss QR-Bill", "GDPR", "EU VAT",
-    "Business OS", "Invoicing", "Knowledge Base", "European CRM",
+    "Business OS", "Invoicing", "Knowledge Base", "Swiss Made", "MenteIQ",
   ],
-  authors: [{ name: "OrbitCRM" }],
-  creator: "OrbitCRM",
-  metadataBase: new URL("https://app.orbitcrm.com"),
+  authors: [{ name: "MenteIQ" }],
+  creator: "MenteIQ",
+  metadataBase: new URL("https://app.menteiq.ch"),
   alternates: {
     canonical: "/",
   },
@@ -38,25 +38,25 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://app.orbitcrm.com",
-    title: "OrbitCRM — AI-Powered CRM for European Service Professionals",
+    url: "https://app.menteiq.ch",
+    title: "MenteIQ — Swiss-Made AI Business OS for Service Professionals",
     description:
-      "AI-native CRM, invoicing, and knowledge base for European service professionals. Swiss QR-Bill, GDPR compliant, EU VAT ready.",
-    siteName: "OrbitCRM",
+      "Swiss-made AI-native business OS: CRM, invoicing, and knowledge base for service professionals. Swiss QR-Bill, GDPR compliant, EU VAT ready.",
+    siteName: "MenteIQ",
     images: [
       {
         url: "/images/landing/hero-dashboard.webp",
         width: 1024,
         height: 1024,
-        alt: "OrbitCRM Dashboard",
+        alt: "MenteIQ Dashboard",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "OrbitCRM — AI-Powered CRM",
+    title: "MenteIQ — Swiss-Made AI Business OS",
     description:
-      "AI-native CRM for European service professionals. Swiss QR-Bill, GDPR, EU VAT ready.",
+      "Swiss-made AI business OS for service professionals. Swiss QR-Bill, GDPR, EU VAT ready.",
     images: ["/images/landing/hero-dashboard.webp"],
   },
   icons: {

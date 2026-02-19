@@ -1,5 +1,5 @@
 /**
- * OrbitCRM Database Schema Types
+ * MenteIQ Database Schema Types
  * 
  * Generated from Supabase schema.
  * Keep in sync with supabase/migrations/*.sql

@@ -43,7 +43,7 @@ export default async function PortalLayout({
                             © {new Date().getFullYear()} {orgName}. All rights reserved.
                         </p>
                         <p className="text-xs text-slate-500">
-                            Powered by OrbitCRM
+                            Powered by MenteIQ
                         </p>
                     </div>
                 </div>

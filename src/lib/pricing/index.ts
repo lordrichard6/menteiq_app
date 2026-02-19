@@ -1,5 +1,5 @@
 /**
- * OrbitCRM Pricing Configuration
+ * MenteIQ Pricing Configuration
  *
  * 4-tier structure designed for sustainable margins:
  *
@@ -67,7 +67,7 @@ export const tiers: Record<SubscriptionTier, TierConfig> = {
     availableModels: ['gpt-4o-mini'],
     maxPacks: 0,
     ctaLabel: 'Start Free',
-    ctaHref: 'https://app.orbitcrm.com/signup',
+    ctaHref: 'https://app.menteiq.ch/signup',
     features: [
       'CRM, Tasks, Invoicing',
       '1,000 AI tokens / month',
@@ -91,7 +91,7 @@ export const tiers: Record<SubscriptionTier, TierConfig> = {
     maxPacks: 1,
     highlighted: true,
     ctaLabel: 'Get Started',
-    ctaHref: 'https://app.orbitcrm.com/signup?plan=pro',
+    ctaHref: 'https://app.menteiq.ch/signup?plan=pro',
     features: [
       'Everything in Free',
       '50,000 AI tokens / month',
@@ -115,7 +115,7 @@ export const tiers: Record<SubscriptionTier, TierConfig> = {
     availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'gemini-pro'],
     maxPacks: -1,
     ctaLabel: 'Get Started',
-    ctaHref: 'https://app.orbitcrm.com/signup?plan=business',
+    ctaHref: 'https://app.menteiq.ch/signup?plan=business',
     features: [
       'Everything in Pro',
       '200,000 AI tokens / month',
@@ -138,7 +138,7 @@ export const tiers: Record<SubscriptionTier, TierConfig> = {
     availableModels: ['gpt-4o-mini', 'gpt-4o', 'claude-3-5-sonnet', 'claude-opus-4', 'gemini-pro'],
     maxPacks: -1,
     ctaLabel: 'Contact Sales',
-    ctaHref: 'mailto:sales@orbitcrm.com',
+    ctaHref: 'mailto:sales@menteiq.ch',
     features: [
       'Everything in Business',
       '500,000 AI tokens / month',

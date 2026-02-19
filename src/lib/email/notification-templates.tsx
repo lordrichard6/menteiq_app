@@ -103,7 +103,7 @@ export function OverdueInvoiceEmail({
           <tr>
             <td style="padding: 24px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
               <p style="margin: 0; font-size: 12px; line-height: 18px; color: #6b7280; text-align: center;">
-                This is an automated notification from OrbitCRM
+                This is an automated notification from MenteIQ
               </p>
             </td>
           </tr>
@@ -209,7 +209,7 @@ export function TaskReminderEmail({
           <tr>
             <td style="padding: 24px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
               <p style="margin: 0; font-size: 12px; line-height: 18px; color: #6b7280; text-align: center;">
-                This is an automated notification from OrbitCRM
+                This is an automated notification from MenteIQ
               </p>
             </td>
           </tr>
@@ -297,7 +297,7 @@ export function FollowUpReminderEmail({
           <tr>
             <td style="padding: 24px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; border-radius: 0 0 12px 12px;">
               <p style="margin: 0; font-size: 12px; line-height: 18px; color: #6b7280; text-align: center;">
-                This is an automated notification from OrbitCRM
+                This is an automated notification from MenteIQ
               </p>
             </td>
           </tr>

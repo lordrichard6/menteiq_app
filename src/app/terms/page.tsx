@@ -17,7 +17,7 @@ export default function TermsPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">1. Acceptance of Terms</h2>
                         <p className="text-slate-600 mb-4">
-                            By accessing and using OrbitCRM ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.
+                            By accessing and using MenteIQ ("the Service"), you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.
                         </p>
                     </section>
 
@@ -38,21 +38,21 @@ export default function TermsPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">4. Intellectual Property</h2>
                         <p className="text-slate-600 mb-4">
-                            The Service and its original content, features, and functionality are and will remain the exclusive property of OrbitCRM and its licensors. The Service is protected by copyright, trademark, and other laws of both the United States and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of OrbitCRM.
+                            The Service and its original content, features, and functionality are and will remain the exclusive property of MenteIQ and its licensors. The Service is protected by copyright, trademark, and other laws of both the United States and foreign countries. Our trademarks and trade dress may not be used in connection with any product or service without the prior written consent of MenteIQ.
                         </p>
                     </section>
 
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">5. Limitation of Liability</h2>
                         <p className="text-slate-600 mb-4">
-                            In no event shall OrbitCRM, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; (iii) any content obtained from the Service; and (iv) unauthorized access, use or alteration of your transmissions or content, whether based on warranty, contract, tort (including negligence) or any other legal theory, whether or not we have been informed of the possibility of such damage, and even if a remedy set forth herein is found to have failed of its essential purpose.
+                            In no event shall MenteIQ, nor its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential or punitive damages, including without limitation, loss of profits, data, use, goodwill, or other intangible losses, resulting from (i) your access to or use of or inability to access or use the Service; (ii) any conduct or content of any third party on the Service; (iii) any content obtained from the Service; and (iv) unauthorized access, use or alteration of your transmissions or content, whether based on warranty, contract, tort (including negligence) or any other legal theory, whether or not we have been informed of the possibility of such damage, and even if a remedy set forth herein is found to have failed of its essential purpose.
                         </p>
                     </section>
 
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">6. Contact Us</h2>
                         <p className="text-slate-600 mb-4">
-                            If you have any questions about these Terms, please contact us at legal@orbitcrm.com.
+                            If you have any questions about these Terms, please contact us at legal@menteiq.ch.
                         </p>
                     </section>
                 </div>

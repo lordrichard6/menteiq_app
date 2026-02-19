@@ -1,4 +1,4 @@
-// Mock data seed for OrbitCRM demo
+// Mock data seed for MenteIQ demo
 
 import { Contact } from '@/types/contact'
 import { Project } from '@/types/project'

@@ -1,4 +1,4 @@
-// Contact types for OrbitCRM
+// Contact types for MenteIQ
 
 export type ContactStatus = 'lead' | 'opportunity' | 'client' | 'churned'
 

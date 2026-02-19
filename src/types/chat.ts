@@ -1,4 +1,4 @@
-// Chat types for OrbitCRM
+// Chat types for MenteIQ
 
 export interface Message {
     id: string

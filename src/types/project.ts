@@ -1,4 +1,4 @@
-// Project types for OrbitCRM
+// Project types for MenteIQ
 
 export type ProjectStatus = 'lead' | 'active' | 'on_hold' | 'completed' | 'archived'
 

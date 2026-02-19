@@ -73,10 +73,10 @@ export function SeedDataButton() {
 
     const handleClear = () => {
         // Clear localStorage
-        localStorage.removeItem('orbitcrm-contacts')
-        localStorage.removeItem('orbitcrm-projects')
-        localStorage.removeItem('orbitcrm-tasks')
-        localStorage.removeItem('orbitcrm-chat')
+        localStorage.removeItem('menteiq-contacts')
+        localStorage.removeItem('menteiq-projects')
+        localStorage.removeItem('menteiq-tasks')
+        localStorage.removeItem('menteiq-chat')
         // Reload page to reset stores
         window.location.reload()
     }

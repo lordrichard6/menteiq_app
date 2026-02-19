@@ -28,7 +28,7 @@ export default function LoginPage() {
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl text-[#3D4A67]">Welcome back</CardTitle>
                     <CardDescription className="text-slate-600">
-                        Sign in to your OrbitCRM account
+                        Sign in to your MenteIQ account
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

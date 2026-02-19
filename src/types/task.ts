@@ -1,4 +1,4 @@
-// Task types for OrbitCRM
+// Task types for MenteIQ
 
 export type TaskStatus = 'todo' | 'in_progress' | 'done'
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent'

@@ -24,7 +24,7 @@ export function Omnibox() {
         <Card className="fixed bottom-4 right-4 w-[400px] h-[500px] shadow-2xl flex flex-col z-50 border-slate-200 dark:border-slate-800">
             <div className="p-3 border-b flex items-center bg-slate-50 dark:bg-slate-900 rounded-t-lg">
                 <Sparkles className="w-4 h-4 text-purple-600 mr-2" />
-                <span className="font-semibold text-sm">Orbit AI</span>
+                <span className="font-semibold text-sm">Mente AI</span>
             </div>
 
             <div className="flex-1 p-4 overflow-y-auto" ref={scrollRef}>

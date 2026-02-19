@@ -1,4 +1,4 @@
-// Document types for OrbitCRM
+// Document types for MenteIQ
 
 export type DocVisibility = 'internal' | 'shared'
 export type EmbeddingStatus = 'pending' | 'processing' | 'complete' | 'error'
