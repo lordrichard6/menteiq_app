@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import Image from "next/image"
-import { Mail, Lock, ArrowRight, ShieldCheck, MapPin, Globe } from 'lucide-react'
+import { Mail, Lock, ArrowRight, ShieldCheck, Globe, FlaskConical } from 'lucide-react'
 import { login, signInWithGoogle } from "../actions"
 import { useActionState } from "react"
 
@@ -29,6 +29,15 @@ export default function LoginPage() {
             {/* Logo */}
             <div className="mb-6 flex flex-col items-center gap-2">
                 <Image src="/menteiq_logo.svg" alt="MenteIQ" width={120} height={32} priority />
+            </div>
+
+            {/* Development notice */}
+            <div className="w-full max-w-md mb-4 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                <FlaskConical className="h-4 w-4 mt-0.5 shrink-0 text-amber-500" />
+                <p className="text-xs leading-relaxed">
+                    <span className="font-semibold">MenteIQ is under active development.</span>{' '}
+                    Features may change, and some areas are still being built. We appreciate your patience as we work toward launch.
+                </p>
             </div>
 
             <Card className="w-full max-w-md border-slate-200 bg-white shadow-lg">
