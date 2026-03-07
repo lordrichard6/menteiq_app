@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { createClient } from '@/lib/supabase/client'
-import { Shield, Check, X, Clock, History } from 'lucide-react'
+import { Shield, Check, X, Clock, History, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 
@@ -36,6 +36,7 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
     const [showHistory, setShowHistory] = useState(false)
     const [consentHistory, setConsentHistory] = useState<ConsentHistoryEntry[]>([])
     const [loadingHistory, setLoadingHistory] = useState(false)
+    const [historyError, setHistoryError] = useState(false)
 
     useEffect(() => {
         if (currentConsent) {
@@ -46,6 +47,7 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
 
     const loadConsentHistory = async () => {
         setLoadingHistory(true)
+        setHistoryError(false)
         try {
             const supabase = createClient()
             const { data, error } = await supabase
@@ -59,6 +61,7 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
             setConsentHistory(data || [])
         } catch (error) {
             console.error('Failed to load consent history:', error)
+            setHistoryError(true)
         } finally {
             setLoadingHistory(false)
         }
@@ -216,6 +219,17 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
                         <h4 className="text-sm font-medium text-slate-900 mb-3">Consent History</h4>
                         {loadingHistory ? (
                             <p className="text-sm text-slate-500">Loading history...</p>
+                        ) : historyError ? (
+                            <div className="flex items-center gap-2 text-sm text-red-600 py-2">
+                                <AlertCircle className="h-4 w-4 shrink-0" />
+                                <span>Failed to load consent history. Please try again.</span>
+                                <button
+                                    onClick={loadConsentHistory}
+                                    className="underline text-xs text-slate-500 hover:text-slate-700 ml-1"
+                                >
+                                    Retry
+                                </button>
+                            </div>
                         ) : consentHistory.length === 0 ? (
                             <p className="text-sm text-slate-500">No consent history recorded yet.</p>
                         ) : (
@@ -239,7 +253,9 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
                                                 {entry.consent_given ? 'Granted' : 'Revoked'}
                                             </div>
                                             <div className="text-slate-600">
-                                                {formatDistanceToNow(new Date(entry.consent_date), { addSuffix: true })}
+                                                {entry.consent_date
+                                                    ? formatDistanceToNow(new Date(entry.consent_date), { addSuffix: true })
+                                                    : 'Date unknown'}
                                             </div>
                                             {entry.notes && (
                                                 <div className="text-slate-500 mt-1">{entry.notes}</div>

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle, SearchX } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle, SearchX, ChevronDown } from 'lucide-react'
 import Link from 'next/link'
 import { TagsInput } from '@/components/contacts/tags-input'
 import { NotesSection } from '@/components/contacts/notes-section'
@@ -54,16 +54,23 @@ export default function ContactDetailPage() {
     // Ref for click-outside detection on the export dropdown
     const exportMenuRef = useRef<HTMLDivElement>(null)
 
-    // Close export menu when clicking outside
+    // Close export menu when clicking outside or pressing Escape
     useEffect(() => {
         if (!showExportMenu) return
-        const handler = (e: MouseEvent) => {
+        const handleClick = (e: MouseEvent) => {
             if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
                 setShowExportMenu(false)
             }
         }
-        document.addEventListener('mousedown', handler)
-        return () => document.removeEventListener('mousedown', handler)
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setShowExportMenu(false)
+        }
+        document.addEventListener('mousedown', handleClick)
+        document.addEventListener('keydown', handleKey)
+        return () => {
+            document.removeEventListener('mousedown', handleClick)
+            document.removeEventListener('keydown', handleKey)
+        }
     }, [showExportMenu])
 
     useEffect(() => {
@@ -121,6 +128,9 @@ export default function ContactDetailPage() {
             } else {
                 // Regular soft delete (archive)
                 await deleteContact(contactId)
+                toast.success('Contact archived', {
+                    description: 'The contact has been moved to the archive.',
+                })
                 router.push('/contacts')
             }
         } catch (error) {
@@ -137,14 +147,19 @@ export default function ContactDetailPage() {
 
     const handleExport = (format: 'json' | 'csv') => {
         const url = `/api/contacts/${contactId}/export?format=${format}`
-        window.open(url, '_blank')
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `contact-${contactId}-export.${format}`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
         setShowExportMenu(false)
     }
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
+                <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" aria-label="Loading contact" />
                 <span className="ml-2 text-slate-500">Loading contact...</span>
             </div>
         )
@@ -207,7 +222,7 @@ export default function ContactDetailPage() {
                                         value={contact.status}
                                         onValueChange={(v) => updateStatus(contactId, v as ContactStatus)}
                                     >
-                                        <SelectTrigger className="w-40 h-9">
+                                        <SelectTrigger className="w-40 h-9" aria-label="Contact status">
                                             <Badge className={STATUS_COLORS[contact.status]}>
                                                 {STATUS_LABELS[contact.status]}
                                             </Badge>
@@ -223,14 +238,14 @@ export default function ContactDetailPage() {
 
                                     {/* Tags Preview */}
                                     <div className="flex flex-wrap gap-1">
-                                        {contact.tags.slice(0, 3).map((tag) => (
+                                        {(contact.tags ?? []).slice(0, 3).map((tag) => (
                                             <Badge key={tag} variant="secondary" className="bg-slate-100 text-slate-700">
                                                 {tag}
                                             </Badge>
                                         ))}
-                                        {contact.tags.length > 3 && (
+                                        {(contact.tags ?? []).length > 3 && (
                                             <Badge variant="secondary" className="bg-slate-100 text-slate-700">
-                                                +{contact.tags.length - 3}
+                                                +{(contact.tags ?? []).length - 3}
                                             </Badge>
                                         )}
                                     </div>
@@ -240,25 +255,35 @@ export default function ContactDetailPage() {
 
                         {/* Action Buttons */}
                         <div className="flex flex-wrap gap-2 sm:shrink-0">
-                            {/* Export menu with proper click-outside handling */}
+                            {/* Export menu with proper click-outside / keyboard handling */}
                             <div className="relative" ref={exportMenuRef}>
                                 <Button
                                     variant="outline"
                                     onClick={() => setShowExportMenu(prev => !prev)}
+                                    aria-haspopup="menu"
+                                    aria-expanded={showExportMenu}
+                                    aria-label="Export contact data"
                                     className="border-slate-300"
                                 >
                                     <Download className="h-4 w-4 mr-2" />
                                     Export Data
+                                    <ChevronDown className="h-3 w-3 ml-1 opacity-60" />
                                 </Button>
                                 {showExportMenu && (
-                                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-slate-200 z-20">
+                                    <div
+                                        role="menu"
+                                        aria-label="Export format options"
+                                        className="absolute right-0 mt-2 w-44 bg-white rounded-lg shadow-lg border border-slate-200 z-20"
+                                    >
                                         <button
+                                            role="menuitem"
                                             onClick={() => handleExport('json')}
                                             className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg"
                                         >
                                             Export as JSON
                                         </button>
                                         <button
+                                            role="menuitem"
                                             onClick={() => handleExport('csv')}
                                             className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-b-lg"
                                         >

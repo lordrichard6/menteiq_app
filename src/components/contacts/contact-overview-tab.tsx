@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useInvoiceStore } from '@/stores/invoice-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useTaskStore } from '@/stores/task-store'
 import { PortalAccessSection } from './portal-access-section'
 import { ActivityTimeline } from './activity-timeline'
 import { ConsentManagement } from './consent-management'
@@ -24,6 +25,9 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
     const projects = useProjectStore((state) => state.projects)
     const isLoadingProjects = useProjectStore((state) => state.isLoading)
     const fetchProjects = useProjectStore((state) => state.fetchProjects)
+    const tasks = useTaskStore((state) => state.tasks)
+    const isLoadingTasks = useTaskStore((state) => state.isLoading)
+    const fetchTasks = useTaskStore((state) => state.fetchTasks)
 
     // Ensure related stores are loaded for accurate stats
     useEffect(() => {
@@ -32,6 +36,9 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
         }
         if (projects.length === 0 && !isLoadingProjects) {
             fetchProjects()
+        }
+        if (tasks.length === 0 && !isLoadingTasks) {
+            fetchTasks()
         }
     }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -174,7 +181,7 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                                 <MapPin className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
                                 <div className="text-sm text-slate-700 space-y-0.5">
                                     {addressParts.map((part, i) => (
-                                        <div key={i}>{part}</div>
+                                        <div key={`addr-${i}-${part}`}>{part}</div>
                                     ))}
                                 </div>
                             </div>

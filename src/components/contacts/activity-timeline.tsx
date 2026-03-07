@@ -83,15 +83,18 @@ const EVENT_LABELS: Record<EventType, string> = {
 export function ActivityTimeline({ contactId }: ActivityTimelineProps) {
     const [activities, setActivities] = useState<ActivityEntry[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [hasError, setHasError] = useState(false)
     const [filter, setFilter] = useState<EventType | 'all'>('all')
 
     const loadActivities = useCallback(async () => {
         setIsLoading(true)
+        setHasError(false)
         try {
             const data = await getEntityActivity('contact', contactId)
             setActivities(data as ActivityEntry[])
         } catch (error) {
             console.error('Failed to load activities:', error)
+            setHasError(true)
         } finally {
             setIsLoading(false)
         }
@@ -112,8 +115,28 @@ export function ActivityTimeline({ contactId }: ActivityTimelineProps) {
                     <CardTitle className="text-[#3D4A67]">Activity Timeline</CardTitle>
                 </CardHeader>
                 <CardContent className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+                    <Loader2 className="h-6 w-6 animate-spin text-slate-400" aria-label="Loading activities" />
                     <span className="ml-2 text-slate-500">Loading activities...</span>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (hasError) {
+        return (
+            <Card className="border-slate-200 bg-white">
+                <CardHeader>
+                    <CardTitle className="text-[#3D4A67]">Activity Timeline</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-12 text-center gap-3">
+                    <AlertCircle className="h-10 w-10 text-red-300" />
+                    <p className="text-slate-600 text-sm">Failed to load activity history.</p>
+                    <button
+                        onClick={loadActivities}
+                        className="text-xs text-[#3D4A67] underline hover:no-underline"
+                    >
+                        Try again
+                    </button>
                 </CardContent>
             </Card>
         )
@@ -125,7 +148,7 @@ export function ActivityTimeline({ contactId }: ActivityTimelineProps) {
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-[#3D4A67]">Activity Timeline</CardTitle>
                     <Select value={filter} onValueChange={(v) => setFilter(v as EventType | 'all')}>
-                        <SelectTrigger className="w-40">
+                        <SelectTrigger className="w-40" aria-label="Filter activities by type">
                             <SelectValue placeholder="Filter by type" />
                         </SelectTrigger>
                         <SelectContent>

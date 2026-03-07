@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Contact } from '@/types/contact'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,11 @@ export function PortalAccessSection({ contact }: PortalAccessSectionProps) {
     contact.portal_enabled || false
   )
   const [isSendingInvite, setIsSendingInvite] = useState(false)
+
+  // Keep local state in sync if the contact prop changes (e.g., after a store update)
+  useEffect(() => {
+    setPortalEnabled(contact.portal_enabled || false)
+  }, [contact.portal_enabled])
   const [isTogglingPortal, setIsTogglingPortal] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -97,12 +102,16 @@ export function PortalAccessSection({ contact }: PortalAccessSectionProps) {
     }
   }
 
-  const handleCopyPortalLink = () => {
+  const handleCopyPortalLink = async () => {
     if (portalUrl) {
-      navigator.clipboard.writeText(portalUrl)
-      setCopied(true)
-      toast.success('Portal link copied to clipboard')
-      setTimeout(() => setCopied(false), 2000)
+      try {
+        await navigator.clipboard.writeText(portalUrl)
+        setCopied(true)
+        toast.success('Portal link copied to clipboard')
+        setTimeout(() => setCopied(false), 2000)
+      } catch {
+        toast.error('Failed to copy link to clipboard')
+      }
     }
   }
 

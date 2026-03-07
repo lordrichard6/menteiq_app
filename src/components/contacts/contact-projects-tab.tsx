@@ -32,7 +32,7 @@ const STATUS_LABELS = {
 export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
     const router = useRouter()
     const projects = useProjectStore((state) => state.projects)
-    const [filter, setFilter] = useState<'all' | 'planning' | 'active' | 'completed' | 'on_hold'>('all')
+    const [filter, setFilter] = useState<'all' | 'lead' | 'active' | 'completed' | 'on_hold'>('all')
 
     const contactProjects = useMemo(() => {
         const filtered = projects.filter(proj => proj.clientId === contact.id)
@@ -54,12 +54,12 @@ export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
                         All
                     </Button>
                     <Button
-                        variant={filter === 'planning' ? 'default' : 'outline'}
+                        variant={filter === 'lead' ? 'default' : 'outline'}
                         size="sm"
-                        onClick={() => setFilter('planning')}
-                        className={filter === 'planning' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
+                        onClick={() => setFilter('lead')}
+                        className={filter === 'lead' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
                     >
-                        Planning
+                        Lead
                     </Button>
                     <Button
                         variant={filter === 'active' ? 'default' : 'outline'}

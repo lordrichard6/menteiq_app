@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useContactStore } from '@/stores/contact-store'
 import { Contact } from '@/types/contact'
 import {
@@ -14,14 +14,31 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, AlertCircle, Phone } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
 import { isValidEmail, isValidPhone, formatPhone } from '@/lib/validation/contact'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { toast } from 'sonner'
 
 interface EditContactDialogProps {
     contact: Contact
     open: boolean
     onOpenChange: (open: boolean) => void
+}
+
+function buildInitialForm(contact: Contact) {
+    return {
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        isCompany: contact.isCompany,
+        companyName: contact.companyName || '',
+        email: contact.email,
+        phone: contact.phone || '',
+        addressLine1: contact.addressLine1 || '',
+        addressLine2: contact.addressLine2 || '',
+        postalCode: contact.postalCode || '',
+        city: contact.city || '',
+        country: contact.country || '',
+    }
 }
 
 export function EditContactDialog({ contact, open, onOpenChange }: EditContactDialogProps) {
@@ -30,14 +47,16 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
     const [emailError, setEmailError] = useState<string | null>(null)
     const [phoneError, setPhoneError] = useState<string | null>(null)
     const [isCheckingEmail, setIsCheckingEmail] = useState(false)
-    const [formData, setFormData] = useState({
-        firstName: contact.firstName,
-        lastName: contact.lastName,
-        isCompany: contact.isCompany,
-        companyName: contact.companyName || '',
-        email: contact.email,
-        phone: contact.phone || '',
-    })
+    const [formData, setFormData] = useState(() => buildInitialForm(contact))
+
+    // Reset form to latest contact data whenever the dialog opens
+    useEffect(() => {
+        if (open) {
+            setFormData(buildInitialForm(contact))
+            setEmailError(null)
+            setPhoneError(null)
+        }
+    }, [open, contact])
 
     const handleEmailBlur = async () => {
         const email = formData.email?.trim()
@@ -66,7 +85,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
 
         if (isValidPhone(phone)) {
             const formatted = formatPhone(phone)
-            setFormData({ ...formData, phone: formatted })
+            setFormData(prev => ({ ...prev, phone: formatted }))
             setPhoneError(null)
 
             setIsCheckingEmail(true)
@@ -94,10 +113,16 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                 companyName: formData.companyName || undefined,
                 email: formData.email,
                 phone: formData.phone || undefined,
+                addressLine1: formData.addressLine1 || undefined,
+                addressLine2: formData.addressLine2 || undefined,
+                postalCode: formData.postalCode || undefined,
+                city: formData.city || undefined,
+                country: formData.country || undefined,
             })
+            toast.success('Contact updated successfully')
             onOpenChange(false)
-        } catch (err: any) {
-            setEmailError(err.message)
+        } catch (err: unknown) {
+            setEmailError(err instanceof Error ? err.message : 'An error occurred')
         } finally {
             setIsLoading(false)
         }
@@ -105,7 +130,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px] bg-white">
+            <DialogContent className="sm:max-w-[540px] bg-white max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="text-[#3D4A67]">Edit Contact</DialogTitle>
                     <DialogDescription className="text-slate-600">
@@ -114,11 +139,12 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* Individual / Company toggle */}
                     <div className="grid grid-cols-2 gap-4">
                         <Button
                             type="button"
                             variant={formData.isCompany ? "outline" : "default"}
-                            onClick={() => setFormData({ ...formData, isCompany: false })}
+                            onClick={() => setFormData(prev => ({ ...prev, isCompany: false }))}
                             className={!formData.isCompany ? "bg-[#3D4A67] text-white" : ""}
                         >
                             Individual
@@ -126,13 +152,14 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                         <Button
                             type="button"
                             variant={formData.isCompany ? "default" : "outline"}
-                            onClick={() => setFormData({ ...formData, isCompany: true })}
+                            onClick={() => setFormData(prev => ({ ...prev, isCompany: true }))}
                             className={formData.isCompany ? "bg-[#3D4A67] text-white" : ""}
                         >
                             Company
                         </Button>
                     </div>
 
+                    {/* Name fields */}
                     {!formData.isCompany ? (
                         <>
                             <div className="grid grid-cols-2 gap-4">
@@ -141,7 +168,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                                     <Input
                                         id="firstName"
                                         value={formData.firstName}
-                                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
                                         placeholder="John"
                                         required={!formData.isCompany}
                                         className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
@@ -152,7 +179,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                                     <Input
                                         id="lastName"
                                         value={formData.lastName}
-                                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
                                         placeholder="Doe"
                                         className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
                                     />
@@ -163,7 +190,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                                 <Input
                                     id="companyName"
                                     value={formData.companyName}
-                                    onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                                     placeholder="Acme Inc"
                                     className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
                                 />
@@ -175,7 +202,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                             <Input
                                 id="companyName"
                                 value={formData.companyName}
-                                onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                                onChange={(e) => setFormData(prev => ({ ...prev, companyName: e.target.value }))}
                                 placeholder="Acme Inc"
                                 required={formData.isCompany}
                                 className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
@@ -183,16 +210,15 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                         </div>
                     )}
 
+                    {/* Email */}
                     <div className="space-y-2">
-                        <Label htmlFor="email" className="text-slate-700">
-                            Email *
-                        </Label>
+                        <Label htmlFor="email" className="text-slate-700">Email *</Label>
                         <Input
                             id="email"
                             type="email"
                             value={formData.email}
                             onChange={(e) => {
-                                setFormData({ ...formData, email: e.target.value })
+                                setFormData(prev => ({ ...prev, email: e.target.value }))
                                 if (emailError) setEmailError(null)
                             }}
                             onBlur={handleEmailBlur}
@@ -204,23 +230,20 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                         {emailError && (
                             <Alert variant="destructive" className="py-2 px-3 mt-1">
                                 <AlertCircle className="h-3 w-3" />
-                                <AlertDescription className="text-[11px]">
-                                    {emailError}
-                                </AlertDescription>
+                                <AlertDescription className="text-[11px]">{emailError}</AlertDescription>
                             </Alert>
                         )}
                     </div>
 
+                    {/* Phone */}
                     <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-slate-700">
-                            Phone
-                        </Label>
+                        <Label htmlFor="phone" className="text-slate-700">Phone</Label>
                         <Input
                             id="phone"
                             type="tel"
                             value={formData.phone}
                             onChange={(e) => {
-                                setFormData({ ...formData, phone: e.target.value })
+                                setFormData(prev => ({ ...prev, phone: e.target.value }))
                                 if (phoneError) setPhoneError(null)
                             }}
                             onBlur={handlePhoneBlur}
@@ -230,11 +253,70 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                         {phoneError && (
                             <Alert variant="destructive" className="py-2 px-3 mt-1">
                                 <AlertCircle className="h-3 w-3" />
-                                <AlertDescription className="text-[11px]">
-                                    {phoneError}
-                                </AlertDescription>
+                                <AlertDescription className="text-[11px]">{phoneError}</AlertDescription>
                             </Alert>
                         )}
+                    </div>
+
+                    {/* Address */}
+                    <div className="border-t border-slate-200 pt-4 space-y-3">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Address</p>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="addressLine1" className="text-slate-700">Address Line 1</Label>
+                            <Input
+                                id="addressLine1"
+                                value={formData.addressLine1}
+                                onChange={(e) => setFormData(prev => ({ ...prev, addressLine1: e.target.value }))}
+                                placeholder="123 Main Street"
+                                className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="addressLine2" className="text-slate-700">Address Line 2</Label>
+                            <Input
+                                id="addressLine2"
+                                value={formData.addressLine2}
+                                onChange={(e) => setFormData(prev => ({ ...prev, addressLine2: e.target.value }))}
+                                placeholder="Apt 4B"
+                                className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="postalCode" className="text-slate-700">Postal Code</Label>
+                                <Input
+                                    id="postalCode"
+                                    value={formData.postalCode}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, postalCode: e.target.value }))}
+                                    placeholder="8001"
+                                    className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="city" className="text-slate-700">City</Label>
+                                <Input
+                                    id="city"
+                                    value={formData.city}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                                    placeholder="Zürich"
+                                    className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="country" className="text-slate-700">Country</Label>
+                            <Input
+                                id="country"
+                                value={formData.country}
+                                onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                                placeholder="Switzerland"
+                                className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
+                            />
+                        </div>
                     </div>
 
                     <DialogFooter>
