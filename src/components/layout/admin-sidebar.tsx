@@ -242,12 +242,12 @@ export function AdminSidebar() {
         <div className="flex flex-col h-full w-64">
 
           {/* Logo */}
-          <div className="h-16 flex items-center pl-6 shrink-0">
+          <div className="h-16 flex items-center pl-6 shrink-0 overflow-hidden">
             <Image
               src="/menteiq_logo_white.svg"
               alt="MenteIQ"
-              width={110}
-              height={36}
+              width={90}
+              height={30}
               priority
               className={cn(
                 "transition-opacity duration-300",

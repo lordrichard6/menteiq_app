@@ -38,10 +38,11 @@ import { ProjectKanbanBoard } from '@/components/projects/project-kanban-board'
 import { DeadlineBadge } from '@/components/projects/deadline-badge'
 import { PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS, ProjectStatus } from '@/types/project'
 import { PROJECT_TEMPLATES, ProjectTemplate } from '@/types/project-templates'
-import { FolderPlus, Trash2, Loader2, Calendar, User, Search, ArrowUpDown, ChevronLeft, ChevronRight, LayoutGrid, Kanban, BookTemplate } from 'lucide-react'
+import { FolderPlus, Trash2, Loader2, Calendar, User, Search, ArrowUpDown, ChevronLeft, ChevronRight, LayoutGrid, Kanban, BookTemplate, X } from 'lucide-react'
 import { useTaskStore } from '@/stores/task-store'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { toast } from 'sonner'
 
 export default function ProjectsPage() {
     const {
@@ -62,7 +63,7 @@ export default function ProjectsPage() {
         totalCount
     } = useProjectStore()
     const { contacts, fetchContacts } = useContactStore()
-    const { addTask } = useTaskStore()
+    const { tasks: allTasks, addTask, fetchTasks } = useTaskStore()
 
     // Create Project Form State
     const [open, setOpen] = useState(false)
@@ -105,7 +106,17 @@ export default function ProjectsPage() {
     useEffect(() => {
         fetchProjects()
         fetchContacts()
-    }, [fetchProjects, fetchContacts])
+        fetchTasks() // Fetch all tasks (no filter) for kanban progress
+    }, [fetchProjects, fetchContacts, fetchTasks])
+
+    const resetCreateForm = () => {
+        setName('')
+        setDescription('')
+        setClientId('')
+        setDeadline('')
+        setStatus('lead')
+        setSelectedTemplateId('none')
+    }
 
     const handleTemplateChange = (templateId: string) => {
         setSelectedTemplateId(templateId)
@@ -150,15 +161,11 @@ export default function ProjectsPage() {
             }
 
             setOpen(false)
-            // Reset form
-            setName('')
-            setDescription('')
-            setClientId('')
-            setDeadline('')
-            setStatus('lead')
-            setSelectedTemplateId('none')
+            resetCreateForm()
+            toast.success('Project created')
         } catch (error) {
             console.error('Error creating project:', error)
+            toast.error('Failed to create project')
         } finally {
             setIsSubmitting(false)
         }
@@ -166,9 +173,15 @@ export default function ProjectsPage() {
 
     const handleArchive = async () => {
         if (!projectToArchiveId) return
-        await archiveProject(projectToArchiveId)
-        setIsArchiveDialogOpen(false)
-        setProjectToArchiveId(null)
+        try {
+            await archiveProject(projectToArchiveId)
+            toast.success('Project archived')
+        } catch {
+            toast.error('Failed to archive project')
+        } finally {
+            setIsArchiveDialogOpen(false)
+            setProjectToArchiveId(null)
+        }
     }
 
     return (
@@ -199,7 +212,7 @@ export default function ProjectsPage() {
                             <span className="hidden sm:inline">Kanban</span>
                         </Button>
                     </div>
-                    <Dialog open={open} onOpenChange={setOpen}>
+                    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetCreateForm() }}>
                         <DialogTrigger asChild>
                             <Button className="bg-[#9EAE8E] hover:bg-[#7E8E6E] text-white gap-2">
                                 <FolderPlus className="h-4 w-4" />
@@ -292,7 +305,7 @@ export default function ProjectsPage() {
                                     </div>
                                 </div>
                                 <DialogFooter>
-                                    <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>Cancel</Button>
+                                    <Button type="button" variant="outline" onClick={() => { setOpen(false); resetCreateForm() }} disabled={isSubmitting}>Cancel</Button>
                                     <Button type="submit" className="bg-[#9EAE8E] hover:bg-[#7E8E6E]" disabled={isSubmitting}>
                                         {isSubmitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Creating...</> : 'Create Project'}
                                     </Button>
@@ -352,7 +365,7 @@ export default function ProjectsPage() {
                         onValueChange={(v) => {
                             const [col, dir] = v.split('-')
                             if (col !== sortConfig.column || dir !== sortConfig.direction) {
-                                setSort(col as any)
+                                setSort(col as Parameters<typeof setSort>[0])
                             }
                         }}
                     >
@@ -369,6 +382,28 @@ export default function ProjectsPage() {
                             <SelectItem value="deadline-desc">Deadline (Furthest)</SelectItem>
                         </SelectContent>
                     </Select>
+
+                    {(filters.search || filters.status !== 'all' || filters.clientId !== 'all') && (
+                        <>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-9 text-slate-500 hover:text-slate-900 gap-1.5 border border-slate-200"
+                                onClick={() => {
+                                    setLocalSearch('')
+                                    setFilters({ search: '', status: 'all', clientId: 'all' })
+                                }}
+                            >
+                                <X className="h-3.5 w-3.5" />
+                                Clear filters
+                            </Button>
+                            {!isLoading && (
+                                <span className="text-xs text-slate-500 whitespace-nowrap font-medium">
+                                    <span className="text-[#3D4A67] font-bold">{totalCount}</span> found
+                                </span>
+                            )}
+                        </>
+                    )}
                 </div>
             </div>
 
@@ -464,6 +499,7 @@ export default function ProjectsPage() {
             ) : (
                 <ProjectKanbanBoard
                     projects={projects}
+                    tasks={allTasks}
                     onStatusChange={(id, status) => updateProject(id, { status })}
                 />
             )}

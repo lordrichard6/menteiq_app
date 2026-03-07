@@ -1,6 +1,7 @@
 'use client'
 
 import { Project, ProjectStatus, PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS } from '@/types/project'
+import { Task } from '@/types/task'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { DeadlineBadge } from '@/components/projects/deadline-badge'
@@ -18,12 +19,13 @@ import {
 
 interface ProjectKanbanBoardProps {
     projects: Project[]
+    tasks: Task[]
     onStatusChange: (id: string, status: ProjectStatus) => Promise<void>
 }
 
 const COLUMNS: ProjectStatus[] = ['lead', 'active', 'on_hold', 'completed']
 
-export function ProjectKanbanBoard({ projects, onStatusChange }: ProjectKanbanBoardProps) {
+export function ProjectKanbanBoard({ projects, tasks, onStatusChange }: ProjectKanbanBoardProps) {
     // Group projects by status
     const groupedProjects = COLUMNS.reduce((acc, status) => {
         acc[status] = projects.filter(p => p.status === status)
@@ -55,6 +57,7 @@ export function ProjectKanbanBoard({ projects, onStatusChange }: ProjectKanbanBo
                                 <ProjectKanbanCard
                                     key={project.id}
                                     project={project}
+                                    tasks={tasks}
                                     onStatusChange={(s) => onStatusChange(project.id, s)}
                                 />
                             ))
@@ -68,14 +71,17 @@ export function ProjectKanbanBoard({ projects, onStatusChange }: ProjectKanbanBo
 
 function ProjectKanbanCard({
     project,
+    tasks,
     onStatusChange
 }: {
     project: Project,
+    tasks: Task[],
     onStatusChange: (s: ProjectStatus) => void
 }) {
-    // For now, we take 0 as default if we don't have task counts in the project object itself
-    // In a real scenario, we might want to extend the Project type or pass progress separately
-    const progress = 0
+    const projectTasks = tasks.filter(t => t.projectId === project.id)
+    const completedTasks = projectTasks.filter(t => t.status === 'done').length
+    const totalTasks = projectTasks.length
+    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
 
     return (
         <Card className="border-slate-200 bg-white shadow-sm hover:shadow-md transition-all group relative overflow-hidden">

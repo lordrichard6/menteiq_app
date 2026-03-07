@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { useContactStore } from '@/stores/contact-store'
@@ -63,19 +63,32 @@ import { MilestoneSection } from '@/components/projects/milestone-section'
 import { ProjectTimeline } from '@/components/projects/project-timeline-view'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
+import { toast } from 'sonner'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 export default function ProjectDetailPage() {
     const params = useParams()
     const router = useRouter()
     const projectId = params.id as string
-    const { getProject, fetchProjects, isLoading, updateProject } = useProjectStore()
+    const { getProject, fetchProjects, isLoading, updateProject, archiveProject } = useProjectStore()
     const { contacts, fetchContacts } = useContactStore()
     const { tasks, fetchTasks, updateStatus } = useTaskStore()
     const { invoices, fetchInvoices } = useInvoiceStore()
     const { documents, fetchDocuments } = useDocumentStore()
     const project = getProject(projectId)
-    const completedTasks = tasks.filter(t => t.status === 'done').length
-    const totalTasks = tasks.length
+    const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId), [tasks, projectId])
+    const completedTasks = projectTasks.filter(t => t.status === 'done').length
+    const totalTasks = projectTasks.length
     const taskProgress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0
 
     // Edit Form State
@@ -91,32 +104,27 @@ export default function ProjectDetailPage() {
     const [editRecurrenceInterval, setEditRecurrenceInterval] = useState<'monthly' | 'quarterly' | 'yearly' | 'fixed_interval'>('monthly')
     const [editCustomFields, setEditCustomFields] = useState<{ id: string; key: string; value: string }[]>([])
     const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
+    const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false)
 
+    // Only sync form fields when the dialog opens — never on keystroke
     useEffect(() => {
-        if (project) {
-            if (editName !== project.name) setEditName(project.name)
-            if (editDescription !== (project.description || '')) setEditDescription(project.description || '')
-            if (editClientId !== (project.clientId || '')) setEditClientId(project.clientId || '')
-            const formattedDeadline = project.deadline ? project.deadline.toISOString().split('T')[0] : ''
-            if (editDeadline !== formattedDeadline) setEditDeadline(formattedDeadline)
-            if (editStatus !== project.status) setEditStatus(project.status)
-            if (editBudgetAmount !== (project.budget_amount?.toString() || '0')) setEditBudgetAmount(project.budget_amount?.toString() || '0')
-            if (editBudgetCurrency !== (project.budget_currency || 'CHF')) setEditBudgetCurrency(project.budget_currency || 'CHF')
-            if (editIsRecurring !== (project.is_recurring || false)) setEditIsRecurring(project.is_recurring || false)
-            if (editRecurrenceInterval !== (project.recurrence_interval || 'monthly')) setEditRecurrenceInterval(project.recurrence_interval || 'monthly')
-
-            // Sync custom fields
-            const fields = Object.entries(project.custom_fields || {}).map(([key, value]) => ({
+        if (project && isEditDialogOpen) {
+            setEditName(project.name)
+            setEditDescription(project.description || '')
+            setEditClientId(project.clientId || '')
+            setEditDeadline(project.deadline ? project.deadline.toISOString().split('T')[0] : '')
+            setEditStatus(project.status)
+            setEditBudgetAmount(project.budget_amount?.toString() || '0')
+            setEditBudgetCurrency(project.budget_currency || 'CHF')
+            setEditIsRecurring(project.is_recurring || false)
+            setEditRecurrenceInterval(project.recurrence_interval || 'monthly')
+            setEditCustomFields(Object.entries(project.custom_fields || {}).map(([key, value]) => ({
                 id: Math.random().toString(36).substr(2, 9),
                 key,
-                value: String(value)
-            }))
-            if (JSON.stringify(fields.map(f => ({ k: f.key, v: f.value }))) !==
-                JSON.stringify(editCustomFields.map(f => ({ k: f.key, v: f.value })))) {
-                setEditCustomFields(fields)
-            }
+                value: String(value),
+            })))
         }
-    }, [project, editName, editDescription, editClientId, editDeadline, editStatus, editBudgetAmount, editBudgetCurrency, editIsRecurring, editRecurrenceInterval])
+    }, [isEditDialogOpen, project])
 
     useEffect(() => {
         fetchProjects()
@@ -131,29 +139,63 @@ export default function ProjectDetailPage() {
         if (!editName || isSubmittingEdit) return
 
         setIsSubmittingEdit(true)
-        await updateProject(projectId, {
-            name: editName,
-            description: editDescription,
-            clientId: editClientId,
-            deadline: editDeadline ? new Date(editDeadline) : undefined,
-            status: editStatus,
-            budget_amount: parseFloat(editBudgetAmount) || 0,
-            budget_currency: editBudgetCurrency,
-            is_recurring: editIsRecurring,
-            recurrence_interval: editIsRecurring ? editRecurrenceInterval : undefined,
-            custom_fields: editCustomFields.reduce((acc, field) => {
-                if (field.key.trim()) acc[field.key.trim()] = field.value
-                return acc
-            }, {} as Record<string, any>)
-        })
-        setIsSubmittingEdit(false)
-        setIsEditDialogOpen(false)
+        try {
+            await updateProject(projectId, {
+                name: editName,
+                description: editDescription,
+                clientId: editClientId,
+                deadline: editDeadline ? new Date(editDeadline) : undefined,
+                status: editStatus,
+                budget_amount: parseFloat(editBudgetAmount) || 0,
+                budget_currency: editBudgetCurrency,
+                is_recurring: editIsRecurring,
+                recurrence_interval: editIsRecurring ? editRecurrenceInterval : undefined,
+                custom_fields: editCustomFields.reduce((acc, field) => {
+                    if (field.key.trim()) acc[field.key.trim()] = field.value
+                    return acc
+                }, {} as Record<string, string>)
+            })
+            toast.success('Project updated')
+            setIsEditDialogOpen(false)
+        } catch {
+            toast.error('Failed to update project')
+        } finally {
+            setIsSubmittingEdit(false)
+        }
+    }
+
+    const handleArchive = async () => {
+        try {
+            await archiveProject(projectId)
+            toast.success('Project archived')
+            router.push('/projects')
+        } catch {
+            toast.error('Failed to archive project')
+        } finally {
+            setIsArchiveDialogOpen(false)
+        }
+    }
+
+    const handleDownload = async (filePath: string, name: string) => {
+        try {
+            const supabase = createClient()
+            const { data, error } = await supabase.storage
+                .from('documents')
+                .createSignedUrl(filePath, 60)
+            if (error) throw error
+            const link = document.createElement('a')
+            link.href = data.signedUrl
+            link.download = name
+            link.click()
+        } catch {
+            toast.error('Failed to download document')
+        }
     }
 
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3D4A67]"></div>
+                <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
             </div>
         )
     }
@@ -167,7 +209,7 @@ export default function ProjectDetailPage() {
                 <Card>
                     <CardContent className="py-12 text-center">
                         <p className="text-slate-500 text-lg font-medium">Project not found</p>
-                        <p className="text-slate-400">The project you're looking for doesn't exist or was archived.</p>
+                        <p className="text-slate-400">The project you&apos;re looking for doesn&apos;t exist or was archived.</p>
                     </CardContent>
                 </Card>
             </div>
@@ -307,7 +349,7 @@ export default function ProjectDetailPage() {
                                                 <Label htmlFor="edit-interval">Recurrence Interval</Label>
                                                 <Select
                                                     value={editRecurrenceInterval}
-                                                    onValueChange={(v: any) => setEditRecurrenceInterval(v)}
+                                                    onValueChange={(v) => setEditRecurrenceInterval(v as typeof editRecurrenceInterval)}
                                                 >
                                                     <SelectTrigger>
                                                         <SelectValue />
@@ -386,17 +428,41 @@ export default function ProjectDetailPage() {
                             </form>
                         </DialogContent>
                     </Dialog>
-                    <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-2 border-slate-200">
+                    <Button
+                        variant="outline"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-2 border-slate-200"
+                        onClick={() => setIsArchiveDialogOpen(true)}
+                    >
                         <Archive className="h-4 w-4" /> Archive
                     </Button>
                 </div>
             </div>
 
+            <AlertDialog open={isArchiveDialogOpen} onOpenChange={setIsArchiveDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[#3D4A67]">Archive Project?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will move <span className="font-semibold">{project.name}</span> to your archive. You can restore it later from the archived projects view.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleArchive}
+                            className="bg-red-600 hover:bg-red-700 text-white border-0"
+                        >
+                            Archive
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
             {/* Content Tabs */}
             <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="bg-slate-100/50 p-1 border border-slate-200 w-full justify-start md:w-auto">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="tasks">Tasks ({tasks.length})</TabsTrigger>
+                    <TabsTrigger value="tasks">Tasks ({projectTasks.length})</TabsTrigger>
                     <TabsTrigger value="time">Time</TabsTrigger>
                     <TabsTrigger value="documents">Documents ({documents.length})</TabsTrigger>
                     <TabsTrigger value="invoices">Invoices ({invoices.length})</TabsTrigger>
@@ -515,7 +581,7 @@ export default function ProjectDetailPage() {
                             />
                         )}
                     </div>
-                    {tasks.length === 0 ? (
+                    {projectTasks.length === 0 ? (
                         <Card className="border-dashed border-2">
                             <CardContent className="py-12 text-center text-slate-500">
                                 <p className="mb-4">No tasks assigned to this project yet.</p>
@@ -530,9 +596,9 @@ export default function ProjectDetailPage() {
                         </Card>
                     ) : (
                         <div className="grid gap-3">
-                            {tasks.map(task => {
+                            {projectTasks.map(task => {
                                 const isBlocked = task.dependencies?.some(depId => {
-                                    const depTask = tasks.find(t => t.id === depId)
+                                    const depTask = projectTasks.find(t => t.id === depId)
                                     return depTask && depTask.status !== 'done'
                                 })
 
@@ -569,7 +635,7 @@ export default function ProjectDetailPage() {
                                                                     Blocked by:
                                                                 </span>
                                                                 {task.dependencies?.map(depId => {
-                                                                    const depTask = tasks.find(t => t.id === depId)
+                                                                    const depTask = projectTasks.find(t => t.id === depId)
                                                                     if (depTask && depTask.status !== 'done') {
                                                                         return (
                                                                             <span key={depId} className="text-[10px] bg-slate-200 text-slate-600 px-1 rounded truncate max-w-[100px]">
@@ -641,7 +707,13 @@ export default function ProjectDetailPage() {
                                             </div>
                                         </div>
                                         <div className="mt-4 flex items-center justify-end gap-2">
-                                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                onClick={() => handleDownload(doc.filePath, doc.name)}
+                                                title="Download"
+                                            >
                                                 <Download className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -686,7 +758,11 @@ export default function ProjectDetailPage() {
                                 </thead>
                                 <tbody>
                                     {invoices.map(invoice => (
-                                        <tr key={invoice.id} className="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                                        <tr
+                                            key={invoice.id}
+                                            className="border-t border-slate-100 hover:bg-slate-50 transition-colors cursor-pointer"
+                                            onClick={() => router.push(`/invoices/${invoice.id}`)}
+                                        >
                                             <td className="px-4 py-3 font-medium text-[#3D4A67]">{invoice.invoice_number}</td>
                                             <td className="px-4 py-3 text-slate-500">
                                                 {invoice.invoice_date ? format(new Date(invoice.invoice_date), 'MMM d, yyyy') : '-'}
