@@ -39,7 +39,23 @@ export interface ActivityLogEntry {
     entityId: string
     entityName?: string
     description?: string
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
+}
+
+/** Shape returned by the activity_feed view (used in components) */
+export interface ActivityFeedEntry {
+    id: string
+    tenant_id: string
+    user_id: string
+    event_type: EventType
+    entity_type: string
+    entity_id: string
+    entity_name?: string
+    description?: string
+    metadata?: Record<string, unknown>
+    created_at: string
+    user_name?: string
+    user_avatar?: string
 }
 
 /**
@@ -92,9 +108,10 @@ export async function logActivity({
         }
 
         return { success: true }
-    } catch (error: any) {
+    } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('Activity logging error:', error)
-        return { success: false, error: error.message }
+        return { success: false, error: message }
     }
 }
 
@@ -113,7 +130,7 @@ export const ActivityLogger = {
             description: `Created contact: ${contactName}`,
         }),
 
-    contactUpdated: (contactId: string, contactName: string, changes?: Record<string, any>) =>
+    contactUpdated: (contactId: string, contactName: string, changes?: Record<string, unknown>) =>
         logActivity({
             eventType: 'updated',
             entityType: 'contact',
@@ -187,7 +204,7 @@ export const ActivityLogger = {
             description: `Created project: ${projectName}`,
         }),
 
-    projectUpdated: (projectId: string, projectName: string, changes?: Record<string, any>) =>
+    projectUpdated: (projectId: string, projectName: string, changes?: Record<string, unknown>) =>
         logActivity({
             eventType: 'updated',
             entityType: 'project',
@@ -285,7 +302,7 @@ export async function getEntityActivity(
 /**
  * Fetch recent activity for the organization
  */
-export async function getOrganizationActivity(limit = 50) {
+export async function getOrganizationActivity(limit = 50): Promise<ActivityFeedEntry[]> {
     const supabase = createClient()
 
     const { data: { user } } = await supabase.auth.getUser()

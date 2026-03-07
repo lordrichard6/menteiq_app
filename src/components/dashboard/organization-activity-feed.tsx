@@ -1,9 +1,10 @@
 'use client'
 
+import * as React from 'react'
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { getOrganizationActivity, EventType } from '@/lib/activity-log'
+import { getOrganizationActivity, EventType, type ActivityFeedEntry } from '@/lib/activity-log'
 import { formatDistanceToNow } from 'date-fns'
 import {
     UserPlus,
@@ -24,21 +25,6 @@ import {
     AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
-
-interface ActivityEntry {
-    id: string
-    tenant_id: string
-    user_id: string
-    event_type: EventType
-    entity_type: string
-    entity_id: string
-    entity_name?: string
-    description?: string
-    metadata?: Record<string, any>
-    created_at: string
-    user_name?: string
-    user_avatar?: string
-}
 
 const EVENT_ICONS: Record<EventType, React.ReactNode> = {
     created: <UserPlus className="h-3.5 w-3.5 text-green-600" />,
@@ -101,24 +87,28 @@ export function OrganizationActivityFeed({
     limit = 20,
     showViewAll = false
 }: OrganizationActivityFeedProps) {
-    const [activities, setActivities] = useState<ActivityEntry[]>([])
+    const [activities, setActivities] = useState<ActivityFeedEntry[]>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [error, setError] = useState<string | null>(null)
 
-    useEffect(() => {
-        loadActivities()
-    }, [])
-
-    async function loadActivities() {
+    const loadActivities = React.useCallback(async () => {
         setIsLoading(true)
+        setError(null)
         try {
-            const data = await getOrganizationActivity(limit)
-            setActivities(data as ActivityEntry[])
-        } catch (error) {
-            console.error('Failed to load organization activities:', error)
+            const data: ActivityFeedEntry[] = await getOrganizationActivity(limit)
+            setActivities(data)
+        } catch (err) {
+            const message = err instanceof Error ? err.message : 'Failed to load activities'
+            console.error('Failed to load organization activities:', err)
+            setError(message)
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [limit])
+
+    useEffect(() => {
+        loadActivities()
+    }, [loadActivities])
 
     if (isLoading) {
         return (
@@ -137,7 +127,31 @@ export function OrganizationActivityFeed({
         )
     }
 
-    const linkableActivity = (activity: ActivityEntry) => {
+    if (error) {
+        return (
+            <Card className="border-slate-200 bg-white shadow-sm">
+                <CardHeader>
+                    <CardTitle className="text-[#3D4A67]">Recent Activity</CardTitle>
+                    <CardDescription className="text-slate-600">
+                        Organization-wide activity feed
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+                    <AlertCircle className="h-10 w-10 text-red-400 mb-2" />
+                    <p className="text-slate-600 text-sm">Failed to load activity</p>
+                    <button
+                        type="button"
+                        onClick={loadActivities}
+                        className="mt-2 text-sm text-[#3D4A67] hover:underline font-medium"
+                    >
+                        Try again
+                    </button>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    const linkableActivity = (activity: ActivityFeedEntry) => {
         const entityType = activity.entity_type
         if (ENTITY_LINKS[entityType]) {
             return ENTITY_LINKS[entityType](activity.entity_id)
