@@ -14,6 +14,7 @@ interface ProjectStore {
 
     // Actions
     fetchProjects: () => Promise<void>
+    fetchProject: (id: string) => Promise<void>
     setFilters: (filters: Partial<ProjectFilters>) => void
     setSort: (column: ProjectSort['column']) => void
     setPage: (page: number) => void
@@ -26,29 +27,42 @@ interface ProjectStore {
     getProject: (id: string) => Project | undefined
 }
 
+function errMsg(error: unknown): string {
+    return error instanceof Error ? error.message : 'Unknown error'
+}
 
 // Convert DB row to Project
-function dbToProject(row: any): Project {
+function dbToProject(row: Record<string, unknown>): Project {
+    const contacts = row.contacts as Record<string, unknown> | null | undefined
     return {
-        id: row.id,
-        name: row.name,
-        description: row.description,
-        clientId: row.contact_id,
-        clientName: row.contacts?.company_name ||
-            [row.contacts?.first_name, row.contacts?.last_name].filter(Boolean).join(' '),
+        id: row.id as string,
+        name: row.name as string,
+        description: row.description as string | null,
+        clientId: row.contact_id as string | null,
+        clientName: (contacts?.company_name as string | undefined) ||
+            [contacts?.first_name, contacts?.last_name].filter(Boolean).join(' '),
         status: row.status as ProjectStatus,
-        deadline: row.deadline ? new Date(row.deadline) : undefined,
-        budget_amount: row.budget_amount,
-        budget_currency: row.budget_currency,
-        is_recurring: row.is_recurring,
-        recurrence_interval: row.recurrence_interval,
-        next_occurrence_date: row.next_occurrence_date ? new Date(row.next_occurrence_date) : undefined,
-        archivedAt: row.archived_at ? new Date(row.archived_at) : undefined,
-        custom_fields: row.custom_fields || {},
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
+        deadline: row.deadline ? new Date(row.deadline as string) : undefined,
+        budget_amount: row.budget_amount as number,
+        budget_currency: row.budget_currency as string,
+        is_recurring: row.is_recurring as boolean,
+        recurrence_interval: row.recurrence_interval as Project['recurrence_interval'],
+        next_occurrence_date: row.next_occurrence_date ? new Date(row.next_occurrence_date as string) : undefined,
+        archivedAt: row.archived_at ? new Date(row.archived_at as string) : undefined,
+        custom_fields: (row.custom_fields as Record<string, string>) || {},
+        createdAt: new Date(row.created_at as string),
+        updatedAt: new Date(row.updated_at as string),
     }
 }
+
+const PROJECT_SELECT = `
+    *,
+    contacts (
+        first_name,
+        last_name,
+        company_name
+    )
+`
 
 export const useProjectStore = create<ProjectStore>()((set, get) => ({
     projects: [],
@@ -75,14 +89,7 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
 
             let query = supabase
                 .from('projects')
-                .select(`
-                    *,
-                    contacts (
-                        first_name,
-                        last_name,
-                        company_name
-                    )
-                `, { count: 'exact' })
+                .select(PROJECT_SELECT, { count: 'exact' })
 
             // Apply filters
             query = query.is('archived_at', null)
@@ -111,11 +118,40 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
 
             if (error) throw error
 
-            const projects = (data || []).map(dbToProject)
+            const projects = (data || []).map((row) => dbToProject(row as Record<string, unknown>))
             set({ projects, totalCount: count || 0, isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching projects:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: errMsg(error), isLoading: false })
+        }
+    },
+
+    fetchProject: async (id) => {
+        set({ isLoading: true, error: null })
+        try {
+            const supabase = createClient()
+            const { data, error } = await supabase
+                .from('projects')
+                .select(PROJECT_SELECT)
+                .eq('id', id)
+                .single()
+
+            if (error) throw error
+
+            const project = dbToProject(data as Record<string, unknown>)
+            // Upsert into the projects array so getProject() finds it
+            set((state) => {
+                const exists = state.projects.some((p) => p.id === id)
+                return {
+                    projects: exists
+                        ? state.projects.map((p) => (p.id === id ? project : p))
+                        : [...state.projects, project],
+                    isLoading: false,
+                }
+            })
+        } catch (error: unknown) {
+            console.error('Error fetching project:', error)
+            set({ error: errMsg(error), isLoading: false })
         }
     },
 
@@ -186,24 +222,17 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
             const { data, error } = await supabase
                 .from('projects')
                 .insert(dbData)
-                .select(`
-                    *,
-                    contacts (
-                        first_name,
-                        last_name,
-                        company_name
-                    )
-                `)
+                .select(PROJECT_SELECT)
                 .single()
 
             if (error) throw error
 
-            const newProject = dbToProject(data)
+            const newProject = dbToProject(data as Record<string, unknown>)
             set((state) => ({ projects: [newProject, ...state.projects] }))
             return newProject
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error adding project:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
             return null
         }
     },
@@ -213,7 +242,7 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
         try {
             const supabase = createClient()
 
-            const dbUpdates: any = { updated_at: new Date().toISOString() }
+            const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
             if (updates.name !== undefined) dbUpdates.name = updates.name
             if (updates.description !== undefined) dbUpdates.description = updates.description
@@ -243,9 +272,9 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
                     p.id === id ? { ...p, ...updates, updatedAt: new Date() } : p
                 ),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating project:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 
@@ -270,9 +299,9 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
             set((state) => ({
                 projects: state.projects.filter((p) => p.id !== id),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error archiving project:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 
@@ -292,9 +321,9 @@ export const useProjectStore = create<ProjectStore>()((set, get) => ({
 
             // Refresh projects to show the restored one
             await get().fetchProjects()
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error restoring project:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 

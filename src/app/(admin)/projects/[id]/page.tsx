@@ -79,7 +79,7 @@ export default function ProjectDetailPage() {
     const params = useParams()
     const router = useRouter()
     const projectId = params.id as string
-    const { getProject, fetchProjects, isLoading, updateProject, archiveProject } = useProjectStore()
+    const { getProject, fetchProject, isLoading, updateProject, archiveProject } = useProjectStore()
     const { contacts, fetchContacts } = useContactStore()
     const { tasks, fetchTasks, updateStatus } = useTaskStore()
     const { invoices, fetchInvoices } = useInvoiceStore()
@@ -126,12 +126,12 @@ export default function ProjectDetailPage() {
     }, [isEditDialogOpen, project])
 
     useEffect(() => {
-        fetchProjects()
+        fetchProject(projectId)
         fetchContacts()
         fetchTasks(projectId)
         fetchInvoices(projectId)
         fetchDocuments(projectId)
-    }, [fetchProjects, fetchContacts, fetchTasks, fetchInvoices, fetchDocuments, projectId])
+    }, [fetchProject, fetchContacts, fetchTasks, fetchInvoices, fetchDocuments, projectId])
 
     const handleSubmitEdit = async (e: React.FormEvent) => {
         e.preventDefault()
