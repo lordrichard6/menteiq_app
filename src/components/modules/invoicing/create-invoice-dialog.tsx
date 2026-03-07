@@ -11,8 +11,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { createClient } from '@/lib/supabase/client';
 import { useInvoiceStore, LineItemInput } from '@/stores/invoice-store';
 import { getTaxRatesForCountry } from '@/lib/invoices/tax-rates';
-import { FileText, Loader2, Plus, Trash2, X } from 'lucide-react';
+import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { InvoiceType } from '@/lib/types/schema';
+
+interface ContactOption {
+    id: string
+    first_name: string | null
+    last_name: string | null
+    company_name: string | null
+    is_company: boolean
+    country: string
+}
 
 interface LineItem extends LineItemInput {
     id: string; // Temporary ID for UI
@@ -34,7 +44,7 @@ const DEFAULT_LINE_ITEM: () => LineItem = () => ({
 export function CreateInvoiceDialog() {
     const [open, setOpen] = React.useState(false);
     const [loading, setLoading] = React.useState(false);
-    const [contacts, setContacts] = React.useState<any[]>([]);
+    const [contacts, setContacts] = React.useState<ContactOption[]>([]);
     
     // Form state
     const [contactId, setContactId] = React.useState('');
@@ -127,12 +137,12 @@ export function CreateInvoiceDialog() {
 
     const handleCreate = async () => {
         if (!contactId) {
-            alert('Please select a contact');
+            toast.error('Please select a contact');
             return;
         }
 
         if (lineItems.some(item => !item.description || item.unit_price <= 0)) {
-            alert('Please fill in all line items with valid descriptions and prices');
+            toast.error('Please fill in all line items with valid descriptions and prices');
             return;
         }
 
@@ -157,12 +167,12 @@ export function CreateInvoiceDialog() {
             });
 
             if (invoice) {
-                // Download PDF
+                toast.success('Invoice created successfully');
                 window.open(`/api/invoices/${invoice.id}/download`, '_blank');
                 setOpen(false);
             }
-        } catch (e) {
-            alert('Failed to create invoice');
+        } catch {
+            toast.error('Failed to create invoice');
         } finally {
             setLoading(false);
         }

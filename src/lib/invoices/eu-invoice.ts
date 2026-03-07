@@ -187,9 +187,9 @@ export const EUInvoiceService = {
         doc.text(item.quantity.toString(), xPos, rowY, { width: colWidths.qty, align: 'right' });
         xPos += colWidths.qty;
         doc.text(formatMoney(item.unit_price, data.currency), xPos, rowY, { width: colWidths.unitPrice, align: 'right' });
-        xPos += colWidths.tax;
+        xPos += colWidths.unitPrice;
         doc.text(`${item.tax_rate}%`, xPos, rowY, { width: colWidths.tax, align: 'right' });
-        xPos += colWidths.total;
+        xPos += colWidths.tax;
         doc.text(formatMoney(item.line_total, data.currency), xPos, rowY, { width: colWidths.total, align: 'right' });
         
         rowY += 20;

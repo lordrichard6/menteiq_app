@@ -27,24 +27,37 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { CreateInvoiceDialog } from '@/components/modules/invoicing/create-invoice-dialog'
 import { useState, useEffect } from 'react'
-import { 
-    Search, 
-    Filter, 
-    Trash2, 
-    Loader2, 
+import { toast } from 'sonner'
+import {
+    Search,
+    Filter,
+    Trash2,
+    Loader2,
     MoreHorizontal,
     FileText,
     CreditCard,
     CheckCircle,
     Send,
-    ExternalLink,
-    Copy
+    Copy,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react'
 import type { InvoiceStatus } from '@/lib/types/schema'
 
-// Status labels and colors
+const PAGE_SIZE = 20
+
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
     draft: 'Draft',
     sent: 'Sent',
@@ -71,8 +84,7 @@ function formatMoney(amount: number, currency: string): string {
 
 function formatDate(dateStr: string | null): string {
     if (!dateStr) return '-'
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('de-CH', {
+    return new Date(dateStr).toLocaleDateString('de-CH', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
@@ -91,22 +103,23 @@ function getContactName(invoice: InvoiceWithLineItems): string {
 }
 
 export default function InvoicesPage() {
-    const { 
-        invoices, 
-        fetchInvoices, 
+    const {
+        invoices,
+        fetchInvoices,
         deleteInvoice,
         markAsPaid,
         markAsSent,
         createPaymentLink,
-        isLoading, 
-        error 
+        isLoading,
+        error,
     } = useInvoiceStore()
-    
+
     const [search, setSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState<string>('all')
     const [actionLoading, setActionLoading] = useState<string | null>(null)
+    const [deleteId, setDeleteId] = useState<string | null>(null)
+    const [currentPage, setCurrentPage] = useState(1)
 
-    // Fetch invoices on mount
     useEffect(() => {
         fetchInvoices()
     }, [fetchInvoices])
@@ -120,16 +133,27 @@ export default function InvoicesPage() {
         return matchesSearch && matchesStatus
     })
 
-    // Calculate summary stats
+    // Client-side pagination
+    const totalPages = Math.ceil(filteredInvoices.length / PAGE_SIZE)
+    const paginatedInvoices = filteredInvoices.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+    )
+
+    // Summary stats
     const stats = {
         total: invoices.length,
-        draft: invoices.filter(i => i.status === 'draft').length,
         sent: invoices.filter(i => i.status === 'sent').length,
         paid: invoices.filter(i => i.status === 'paid').length,
-        overdue: invoices.filter(i => i.status === 'overdue').length,
-        totalAmount: invoices.reduce((sum, i) => sum + i.amount_total, 0),
-        paidAmount: invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount_total, 0),
     }
+
+    // Revenue grouped by currency — avoids mixing CHF + EUR into one figure
+    const revenueByCurrency = invoices
+        .filter(i => i.status === 'paid')
+        .reduce<Record<string, number>>((acc, inv) => {
+            acc[inv.currency] = (acc[inv.currency] || 0) + inv.amount_total
+            return acc
+        }, {})
 
     const handleDownloadPDF = (invoiceId: string) => {
         window.open(`/api/invoices/${invoiceId}/download`, '_blank')
@@ -139,11 +163,11 @@ export default function InvoicesPage() {
         setActionLoading(invoiceId)
         const link = await createPaymentLink(invoiceId)
         setActionLoading(null)
-        
         if (link) {
-            // Copy to clipboard
             await navigator.clipboard.writeText(link)
-            alert('Payment link copied to clipboard!')
+            toast.success('Payment link copied to clipboard')
+        } else {
+            toast.error('Failed to create payment link')
         }
     }
 
@@ -151,18 +175,23 @@ export default function InvoicesPage() {
         setActionLoading(invoiceId)
         await markAsSent(invoiceId)
         setActionLoading(null)
+        toast.success('Invoice marked as sent')
     }
 
     const handleMarkAsPaid = async (invoiceId: string) => {
         setActionLoading(invoiceId)
         await markAsPaid(invoiceId)
         setActionLoading(null)
+        toast.success('Invoice marked as paid')
     }
 
-    const handleDelete = async (invoiceId: string) => {
-        if (confirm('Are you sure you want to delete this invoice?')) {
-            await deleteInvoice(invoiceId)
-        }
+    const handleDelete = async () => {
+        if (!deleteId) return
+        setActionLoading(deleteId)
+        await deleteInvoice(deleteId)
+        setActionLoading(null)
+        setDeleteId(null)
+        toast.success('Invoice deleted')
     }
 
     return (
@@ -197,9 +226,15 @@ export default function InvoicesPage() {
                 </Card>
                 <Card className="border-slate-200 bg-white">
                     <CardContent className="pt-6">
-                        <div className="text-2xl font-bold text-[#3D4A67]">
-                            {formatMoney(stats.paidAmount, 'CHF')}
-                        </div>
+                        {Object.keys(revenueByCurrency).length === 0 ? (
+                            <div className="text-2xl font-bold text-[#3D4A67]">CHF 0.00</div>
+                        ) : (
+                            Object.entries(revenueByCurrency).map(([currency, amount]) => (
+                                <div key={currency} className="text-xl font-bold text-[#3D4A67]">
+                                    {formatMoney(amount, currency)}
+                                </div>
+                            ))
+                        )}
                         <p className="text-sm text-slate-500">Revenue</p>
                     </CardContent>
                 </Card>
@@ -212,11 +247,11 @@ export default function InvoicesPage() {
                     <Input
                         placeholder="Search by invoice number or contact..."
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={(e) => { setSearch(e.target.value); setCurrentPage(1) }}
                         className="pl-10 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
                     />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}>
                     <SelectTrigger className="w-40 border-slate-300">
                         <Filter className="h-4 w-4 mr-2" />
                         <SelectValue placeholder="Filter" />
@@ -265,116 +300,169 @@ export default function InvoicesPage() {
                             </p>
                         </div>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Invoice #</TableHead>
-                                    <TableHead>Contact</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Due Date</TableHead>
-                                    <TableHead>Amount</TableHead>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredInvoices.map((invoice) => (
-                                    <TableRow key={invoice.id}>
-                                        <TableCell className="font-medium font-mono">
-                                            {invoice.invoice_number}
-                                        </TableCell>
-                                        <TableCell>{getContactName(invoice)}</TableCell>
-                                        <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
-                                        <TableCell>{formatDate(invoice.due_date)}</TableCell>
-                                        <TableCell className="font-medium">
-                                            {formatMoney(invoice.amount_total, invoice.currency)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge variant="outline" className="font-normal">
-                                                {invoice.invoice_type === 'swiss_qr' ? 'Swiss QR' : 'EU SEPA'}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            <Badge className={STATUS_COLORS[invoice.status]}>
-                                                {STATUS_LABELS[invoice.status]}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm"
-                                                        disabled={actionLoading === invoice.id}
-                                                    >
-                                                        {actionLoading === invoice.id ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        )}
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onClick={() => handleDownloadPDF(invoice.id)}>
-                                                        <FileText className="h-4 w-4 mr-2" />
-                                                        Download PDF
-                                                    </DropdownMenuItem>
-                                                    
-                                                    {invoice.stripe_payment_link && (
-                                                        <DropdownMenuItem 
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(invoice.stripe_payment_link!)
-                                                                alert('Payment link copied!')
-                                                            }}
-                                                        >
-                                                            <Copy className="h-4 w-4 mr-2" />
-                                                            Copy Payment Link
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    
-                                                    {!invoice.stripe_payment_link && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
-                                                        <DropdownMenuItem onClick={() => handleCreatePaymentLink(invoice.id)}>
-                                                            <CreditCard className="h-4 w-4 mr-2" />
-                                                            Create Payment Link
-                                                        </DropdownMenuItem>
-                                                    )}
-
-                                                    <DropdownMenuSeparator />
-                                                    
-                                                    {invoice.status === 'draft' && (
-                                                        <DropdownMenuItem onClick={() => handleMarkAsSent(invoice.id)}>
-                                                            <Send className="h-4 w-4 mr-2" />
-                                                            Mark as Sent
-                                                        </DropdownMenuItem>
-                                                    )}
-                                                    
-                                                    {(invoice.status === 'sent' || invoice.status === 'overdue') && (
-                                                        <DropdownMenuItem onClick={() => handleMarkAsPaid(invoice.id)}>
-                                                            <CheckCircle className="h-4 w-4 mr-2" />
-                                                            Mark as Paid
-                                                        </DropdownMenuItem>
-                                                    )}
-
-                                                    <DropdownMenuSeparator />
-                                                    
-                                                    <DropdownMenuItem 
-                                                        onClick={() => handleDelete(invoice.id)}
-                                                        className="text-red-600"
-                                                    >
-                                                        <Trash2 className="h-4 w-4 mr-2" />
-                                                        Delete
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
+                        <>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Invoice #</TableHead>
+                                        <TableHead>Contact</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Due Date</TableHead>
+                                        <TableHead>Amount</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {paginatedInvoices.map((invoice) => (
+                                        <TableRow key={invoice.id}>
+                                            <TableCell className="font-medium font-mono">
+                                                {invoice.invoice_number}
+                                            </TableCell>
+                                            <TableCell>{getContactName(invoice)}</TableCell>
+                                            <TableCell>{formatDate(invoice.invoice_date)}</TableCell>
+                                            <TableCell>{formatDate(invoice.due_date)}</TableCell>
+                                            <TableCell className="font-medium">
+                                                {formatMoney(invoice.amount_total, invoice.currency)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="font-normal">
+                                                    {invoice.invoice_type === 'swiss_qr' ? 'Swiss QR' : 'EU SEPA'}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge className={STATUS_COLORS[invoice.status]}>
+                                                    {STATUS_LABELS[invoice.status]}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={actionLoading === invoice.id}
+                                                        >
+                                                            {actionLoading === invoice.id ? (
+                                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                            ) : (
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            )}
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={() => handleDownloadPDF(invoice.id)}>
+                                                            <FileText className="h-4 w-4 mr-2" />
+                                                            Download PDF
+                                                        </DropdownMenuItem>
+
+                                                        {invoice.stripe_payment_link && (
+                                                            <DropdownMenuItem
+                                                                onClick={async () => {
+                                                                    await navigator.clipboard.writeText(invoice.stripe_payment_link!)
+                                                                    toast.success('Payment link copied')
+                                                                }}
+                                                            >
+                                                                <Copy className="h-4 w-4 mr-2" />
+                                                                Copy Payment Link
+                                                            </DropdownMenuItem>
+                                                        )}
+
+                                                        {!invoice.stripe_payment_link && invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
+                                                            <DropdownMenuItem onClick={() => handleCreatePaymentLink(invoice.id)}>
+                                                                <CreditCard className="h-4 w-4 mr-2" />
+                                                                Create Payment Link
+                                                            </DropdownMenuItem>
+                                                        )}
+
+                                                        <DropdownMenuSeparator />
+
+                                                        {invoice.status === 'draft' && (
+                                                            <DropdownMenuItem onClick={() => handleMarkAsSent(invoice.id)}>
+                                                                <Send className="h-4 w-4 mr-2" />
+                                                                Mark as Sent
+                                                            </DropdownMenuItem>
+                                                        )}
+
+                                                        {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+                                                            <DropdownMenuItem onClick={() => handleMarkAsPaid(invoice.id)}>
+                                                                <CheckCircle className="h-4 w-4 mr-2" />
+                                                                Mark as Paid
+                                                            </DropdownMenuItem>
+                                                        )}
+
+                                                        <DropdownMenuSeparator />
+
+                                                        <DropdownMenuItem
+                                                            onClick={() => setDeleteId(invoice.id)}
+                                                            className="text-red-600"
+                                                        >
+                                                            <Trash2 className="h-4 w-4 mr-2" />
+                                                            Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                                <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <p className="text-sm text-slate-500">
+                                        Showing {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredInvoices.length)} of {filteredInvoices.length}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <span className="text-sm text-slate-600">
+                                            Page {currentPage} of {totalPages}
+                                        </span>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </>
                     )}
                 </CardContent>
             </Card>
+
+            {/* Delete Confirmation Dialog */}
+            <AlertDialog open={!!deleteId} onOpenChange={(open) => { if (!open) setDeleteId(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Invoice</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to delete this invoice? This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleDelete}
+                            className="bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

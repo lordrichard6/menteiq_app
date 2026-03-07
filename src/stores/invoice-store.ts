@@ -2,9 +2,10 @@ import { create } from 'zustand'
 import { createClient } from '@/lib/supabase/client'
 import type {
     Invoice,
+    InvoiceInsert,
     InvoiceLineItem,
     InvoiceStatus,
-    InvoiceType
+    InvoiceType,
 } from '@/lib/types/schema'
 
 // =====================================================
@@ -48,6 +49,7 @@ interface InvoiceStore {
 
     // Actions
     fetchInvoices: (projectId?: string) => Promise<void>
+    fetchInvoice: (id: string) => Promise<void>
     addInvoice: (input: CreateInvoiceInput) => Promise<InvoiceWithLineItems | null>
     updateInvoice: (id: string, updates: Partial<Invoice>, lineItems?: LineItemInput[]) => Promise<void>
     deleteInvoice: (id: string) => Promise<void>
@@ -60,6 +62,10 @@ interface InvoiceStore {
 // =====================================================
 // HELPERS
 // =====================================================
+
+function errMsg(error: unknown): string {
+    return error instanceof Error ? error.message : 'Unknown error'
+}
 
 function calculateTotals(lineItems: LineItemInput[]): {
     subtotal: number
@@ -84,18 +90,16 @@ function calculateTotals(lineItems: LineItemInput[]): {
 }
 
 function generateQRReference(): string {
-    // Generate a random 21-digit number for QR reference
     const randomDigits = Array.from({ length: 21 }, () =>
         Math.floor(Math.random() * 10)
     ).join('')
-
     return randomDigits.replace(/(.{5})/g, '$1 ').trim()
 }
 
-async function generateInvoiceNumber(supabase: any, tenantId: string): Promise<string> {
+async function generateInvoiceNumber(tenantId: string): Promise<string> {
+    const supabase = createClient()
     const year = new Date().getFullYear()
 
-    // Get organization settings for prefix
     const { data: org } = await supabase
         .from('organizations')
         .select('settings')
@@ -106,7 +110,6 @@ async function generateInvoiceNumber(supabase: any, tenantId: string): Promise<s
     const billing = (settings.billing as Record<string, unknown>) || {}
     const prefix = (billing.invoice_prefix as string) || 'INV'
 
-    // Count existing invoices this year for this tenant
     const startOfYear = `${year}-01-01`
     const { count } = await supabase
         .from('invoices')
@@ -119,6 +122,18 @@ async function generateInvoiceNumber(supabase: any, tenantId: string): Promise<s
 
     return `${prefix}-${year}-${paddedNumber}`
 }
+
+const INVOICE_SELECT = `
+    *,
+    contacts (
+        id,
+        first_name,
+        last_name,
+        company_name,
+        is_company,
+        email
+    )
+`
 
 // =====================================================
 // STORE
@@ -134,20 +149,7 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         try {
             const supabase = createClient()
 
-            // Fetch invoices with contacts
-            let query = supabase
-                .from('invoices')
-                .select(`
-                    *,
-                    contacts (
-                        id,
-                        first_name,
-                        last_name,
-                        company_name,
-                        is_company,
-                        email
-                    )
-                `)
+            let query = supabase.from('invoices').select(INVOICE_SELECT)
 
             if (projectId) {
                 query = query.eq('project_id', projectId)
@@ -157,7 +159,7 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
 
             if (error) throw error
 
-            // Fetch line items for all invoices
+            // Fetch line items for all invoices in one query
             const invoiceIds = (invoices || []).map(i => i.id)
             const { data: allLineItems } = await supabase
                 .from('invoice_line_items')
@@ -173,7 +175,6 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
                 lineItemsByInvoice.set(item.invoice_id, existing)
             }
 
-            // Combine invoices with line items
             const invoicesWithLineItems: InvoiceWithLineItems[] = (invoices || []).map(invoice => ({
                 ...invoice,
                 contact: invoice.contacts as InvoiceWithLineItems['contact'],
@@ -181,9 +182,49 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             }))
 
             set({ invoices: invoicesWithLineItems, isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching invoices:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: errMsg(error), isLoading: false })
+        }
+    },
+
+    fetchInvoice: async (id) => {
+        set({ isLoading: true, error: null })
+        try {
+            const supabase = createClient()
+
+            const { data: invoice, error } = await supabase
+                .from('invoices')
+                .select(INVOICE_SELECT)
+                .eq('id', id)
+                .single()
+
+            if (error) throw error
+
+            const { data: lineItems } = await supabase
+                .from('invoice_line_items')
+                .select('*')
+                .eq('invoice_id', id)
+                .order('sort_order', { ascending: true })
+
+            const full: InvoiceWithLineItems = {
+                ...invoice,
+                contact: invoice.contacts as InvoiceWithLineItems['contact'],
+                line_items: lineItems || [],
+            }
+
+            set((state) => {
+                const exists = state.invoices.some(i => i.id === id)
+                return {
+                    invoices: exists
+                        ? state.invoices.map(i => (i.id === id ? full : i))
+                        : [...state.invoices, full],
+                    isLoading: false,
+                }
+            })
+        } catch (error: unknown) {
+            console.error('Error fetching invoice:', error)
+            set({ error: errMsg(error), isLoading: false })
         }
     },
 
@@ -192,7 +233,6 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         try {
             const supabase = createClient()
 
-            // Get current user's tenant_id and IBAN
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) throw new Error('Not authenticated')
 
@@ -204,7 +244,7 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
 
             if (!profile?.tenant_id) throw new Error('No organization found')
 
-            // Get organization settings for IBAN
+            // Get IBAN from org settings
             const { data: org } = await supabase
                 .from('organizations')
                 .select('settings')
@@ -215,21 +255,17 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             const billing = (settings.billing as Record<string, unknown>) || {}
             const iban = (billing.iban as string) || null
 
-            // Calculate totals
             const totals = calculateTotals(input.line_items)
+            const invoiceNumber = await generateInvoiceNumber(profile.tenant_id)
 
-            // Generate invoice number
-            const invoiceNumber = await generateInvoiceNumber(supabase, profile.tenant_id)
-
-            // Create invoice record
-            const invoiceData = {
+            const invoiceData: InvoiceInsert = {
                 tenant_id: profile.tenant_id,
                 contact_id: input.contact_id,
                 project_id: input.project_id || null,
                 invoice_number: invoiceNumber,
                 currency: input.currency,
                 invoice_type: input.invoice_type,
-                status: 'draft' as InvoiceStatus,
+                status: 'draft',
                 subtotal: totals.subtotal,
                 tax_total: totals.tax_total,
                 amount_total: totals.amount_total,
@@ -238,27 +274,19 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
                 qr_reference: input.invoice_type === 'swiss_qr' ? generateQRReference() : null,
                 iban_used: iban,
                 invoice_date: new Date().toISOString().split('T')[0],
+                paid_at: null,
+                stripe_payment_link: null,
+                stripe_payment_id: null,
             }
 
             const { data: invoice, error: invoiceError } = await supabase
                 .from('invoices')
                 .insert(invoiceData)
-                .select(`
-                    *,
-                    contacts (
-                        id,
-                        first_name,
-                        last_name,
-                        company_name,
-                        is_company,
-                        email
-                    )
-                `)
+                .select(INVOICE_SELECT)
                 .single()
 
             if (invoiceError) throw invoiceError
 
-            // Create line items
             const lineItemsData = input.line_items.map((item, index) => ({
                 invoice_id: invoice.id,
                 description: item.description,
@@ -274,7 +302,6 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
                 .select()
 
             if (lineItemsError) {
-                // Rollback: delete the invoice if line items fail
                 await supabase.from('invoices').delete().eq('id', invoice.id)
                 throw lineItemsError
             }
@@ -287,9 +314,9 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
 
             set((state) => ({ invoices: [newInvoice, ...state.invoices] }))
             return newInvoice
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error adding invoice:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
             return null
         }
     },
@@ -299,46 +326,36 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         try {
             const supabase = createClient()
 
-            // Build update object
-            const dbUpdates: any = {}
+            const dbUpdates: Partial<InvoiceInsert> = {}
 
-            if (updates.contact_id !== undefined) dbUpdates.contact_id = updates.contact_id
-            if (updates.project_id !== undefined) dbUpdates.project_id = updates.project_id
-            if (updates.currency !== undefined) dbUpdates.currency = updates.currency
+            if (updates.contact_id   !== undefined) dbUpdates.contact_id   = updates.contact_id
+            if (updates.project_id   !== undefined) dbUpdates.project_id   = updates.project_id
+            if (updates.currency     !== undefined) dbUpdates.currency     = updates.currency
             if (updates.invoice_type !== undefined) dbUpdates.invoice_type = updates.invoice_type
-            if (updates.status !== undefined) dbUpdates.status = updates.status
-            if (updates.due_date !== undefined) dbUpdates.due_date = updates.due_date
-            if (updates.notes !== undefined) dbUpdates.notes = updates.notes
+            if (updates.status       !== undefined) dbUpdates.status       = updates.status
+            if (updates.due_date     !== undefined) dbUpdates.due_date     = updates.due_date
+            if (updates.notes        !== undefined) dbUpdates.notes        = updates.notes
 
-            // If line items are provided, recalculate totals
             if (lineItems) {
                 const totals = calculateTotals(lineItems)
-                dbUpdates.subtotal = totals.subtotal
-                dbUpdates.tax_total = totals.tax_total
+                dbUpdates.subtotal     = totals.subtotal
+                dbUpdates.tax_total    = totals.tax_total
                 dbUpdates.amount_total = totals.amount_total
 
-                // Delete existing line items
-                await supabase
-                    .from('invoice_line_items')
-                    .delete()
-                    .eq('invoice_id', id)
+                await supabase.from('invoice_line_items').delete().eq('invoice_id', id)
 
-                // Insert new line items
                 const lineItemsData = lineItems.map((item, index) => ({
-                    invoice_id: id,
+                    invoice_id:  id,
                     description: item.description,
-                    quantity: item.quantity,
-                    unit_price: item.unit_price,
-                    tax_rate: item.tax_rate,
-                    sort_order: item.sort_order ?? index,
+                    quantity:    item.quantity,
+                    unit_price:  item.unit_price,
+                    tax_rate:    item.tax_rate,
+                    sort_order:  item.sort_order ?? index,
                 }))
 
-                await supabase
-                    .from('invoice_line_items')
-                    .insert(lineItemsData)
+                await supabase.from('invoice_line_items').insert(lineItemsData)
             }
 
-            // Update invoice
             if (Object.keys(dbUpdates).length > 0) {
                 const { error } = await supabase
                     .from('invoices')
@@ -348,11 +365,10 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
                 if (error) throw error
             }
 
-            // Refresh invoices
             await get().fetchInvoices()
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating invoice:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 
@@ -360,19 +376,16 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
-            const { error } = await supabase
-                .from('invoices')
-                .delete()
-                .eq('id', id)
+            const { error } = await supabase.from('invoices').delete().eq('id', id)
 
             if (error) throw error
 
             set((state) => ({
-                invoices: state.invoices.filter((i) => i.id !== id),
+                invoices: state.invoices.filter(i => i.id !== id),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error deleting invoice:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 
@@ -391,15 +404,15 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             if (error) throw error
 
             set((state) => ({
-                invoices: state.invoices.map((i) =>
+                invoices: state.invoices.map(i =>
                     i.id === id
                         ? { ...i, status: 'paid' as InvoiceStatus, paid_at: new Date().toISOString() }
                         : i
                 ),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error marking invoice as paid:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 
@@ -415,13 +428,13 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             if (error) throw error
 
             set((state) => ({
-                invoices: state.invoices.map((i) =>
+                invoices: state.invoices.map(i =>
                     i.id === id ? { ...i, status: 'sent' as InvoiceStatus } : i
                 ),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error marking invoice as sent:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 
@@ -433,28 +446,27 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             })
 
             if (!response.ok) {
-                const data = await response.json()
+                const data = await response.json() as { error?: string }
                 throw new Error(data.error || 'Failed to create payment link')
             }
 
-            const { payment_link } = await response.json()
+            const { payment_link } = await response.json() as { payment_link: string }
 
-            // Update local state with payment link
             set((state) => ({
-                invoices: state.invoices.map((i) =>
+                invoices: state.invoices.map(i =>
                     i.id === id ? { ...i, stripe_payment_link: payment_link } : i
                 ),
             }))
 
             return payment_link
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating payment link:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
             return null
         }
     },
 
     getInvoice: (id) => {
-        return get().invoices.find((i) => i.id === id)
+        return get().invoices.find(i => i.id === id)
     },
 }))
