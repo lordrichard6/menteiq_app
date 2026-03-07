@@ -311,9 +311,7 @@ export default function ContactsPage() {
                                     size="sm"
                                     className="text-white hover:bg-white/10 h-8"
                                     onClick={async () => {
-                                        for (const id of selectedContactIds) {
-                                            await restoreContact(id)
-                                        }
+                                        await Promise.all(selectedContactIds.map(id => restoreContact(id)))
                                         clearSelection()
                                     }}
                                 >
@@ -636,8 +634,9 @@ export default function ContactsPage() {
                 />
             )}
 
-            {/* Merge Dialog */}
+            {/* Merge Dialog — key forces remount when pair changes, resetting state cleanly */}
             <MergeContactsDialog
+                key={selectedContactIds.join('-')}
                 open={isMergeDialogOpen}
                 onOpenChange={setIsMergeDialogOpen}
                 contacts={contacts.filter(c => selectedContactIds.includes(c.id))}

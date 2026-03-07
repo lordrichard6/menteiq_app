@@ -30,9 +30,10 @@ export function PortalAccessSection({ contact }: PortalAccessSectionProps) {
   const [isTogglingPortal, setIsTogglingPortal] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  // Generate portal URL (will be dynamic based on contact's portal_token)
+  // Generate portal URL using env var (safe for SSR — no window.location)
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') || ''
   const portalUrl = contact.portal_token
-    ? `${window.location.origin}/portal/auth/${contact.portal_token}`
+    ? `${siteUrl}/portal/auth/${contact.portal_token}`
     : null
 
   const handleTogglePortal = async () => {

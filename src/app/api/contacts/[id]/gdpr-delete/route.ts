@@ -40,18 +40,23 @@ export async function DELETE(
             )
         }
 
+        // Compute display name from actual DB columns
+        const contactName = contact.is_company
+            ? (contact.company_name || 'Unknown')
+            : `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown'
+
         // Log the deletion action BEFORE deleting (for GDPR compliance audit)
         await logActivity({
             eventType: 'deleted',
             entityType: 'contact',
             entityId: contactId,
-            entityName: contact.name,
+            entityName: contactName,
             description: `GDPR: Right to be Forgotten - Permanent deletion of contact and all related data`,
             metadata: {
                 gdpr_deletion: true,
                 deleted_at: new Date().toISOString(),
                 contact_email: contact.email,
-                contact_name: contact.name,
+                contact_name: contactName,
                 requester_id: user.id,
             },
         })
@@ -61,7 +66,7 @@ export async function DELETE(
             certificate_id: crypto.randomUUID(),
             deletion_type: 'GDPR Right to be Forgotten',
             contact_id: contactId,
-            contact_name: contact.name,
+            contact_name: contactName,
             contact_email: contact.email,
             deleted_at: new Date().toISOString(),
             deleted_by: user.id,
@@ -128,10 +133,11 @@ export async function DELETE(
             message: 'Contact and all related data permanently deleted',
             deletion_certificate: deletionCertificate,
         })
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('GDPR deletion error:', error)
         return NextResponse.json(
-            { error: 'Failed to process GDPR deletion', details: error.message },
+            { error: 'Failed to process GDPR deletion', details: message },
             { status: 500 }
         )
     }

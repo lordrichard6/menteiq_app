@@ -8,6 +8,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+interface ExportData {
+    export_info: {
+        exported_at: string
+        export_format: string
+        contact_id: string
+        gdpr_compliant: boolean
+    }
+    personal_data: Record<string, unknown>
+    invoices: Record<string, unknown>[]
+    tasks: Record<string, unknown>[]
+    projects: Record<string, unknown>[]
+    activity_history: Record<string, unknown>[]
+}
+
 export async function GET(
     request: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -43,8 +57,14 @@ export async function GET(
             )
         }
 
+        // Compute display name from the actual DB columns
+        const contactName = contact.is_company
+            ? (contact.company_name || 'Unknown')
+            : `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unknown'
+
         // Get related data
-        const [invoices, tasks, projects, notes, activities] = await Promise.all([
+        // notes is sourced directly from contact.notes below; we skip it from the array
+        const [invoices, tasks, projects, , activities] = await Promise.all([
             // Invoices
             supabase
                 .from('invoices')
@@ -80,7 +100,7 @@ export async function GET(
         ])
 
         // Compile complete data export
-        const exportData = {
+        const exportData: ExportData = {
             export_info: {
                 exported_at: new Date().toISOString(),
                 export_format: format,
@@ -89,10 +109,10 @@ export async function GET(
             },
             personal_data: {
                 id: contact.id,
-                name: contact.name,
+                name: contactName,
                 email: contact.email,
                 phone: contact.phone,
-                company: contact.company,
+                company: contact.company_name,
                 status: contact.status,
                 tags: contact.tags,
                 notes: contact.notes,
@@ -111,7 +131,7 @@ export async function GET(
                 id: inv.id,
                 invoice_number: inv.invoice_number,
                 status: inv.status,
-                total: inv.total,
+                total: inv.amount_total,
                 due_date: inv.due_date,
                 paid_date: inv.paid_date,
                 created_at: inv.created_at,
@@ -162,16 +182,17 @@ export async function GET(
                 },
             })
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
         console.error('Contact export error:', error)
         return NextResponse.json(
-            { error: 'Failed to export contact data', details: error.message },
+            { error: 'Failed to export contact data', details: message },
             { status: 500 }
         )
     }
 }
 
-function generateCSV(data: any): string {
+function generateCSV(data: ExportData): string {
     const lines: string[] = []
 
     // Header
@@ -183,7 +204,7 @@ function generateCSV(data: any): string {
     lines.push('=== PERSONAL DATA ===')
     lines.push('Field,Value')
     Object.entries(data.personal_data).forEach(([key, value]) => {
-        lines.push(`${key},"${String(value || '').replace(/"/g, '""')}"`)
+        lines.push(`${key},"${String(value ?? '').replace(/"/g, '""')}"`)
     })
     lines.push('')
 
@@ -192,8 +213,8 @@ function generateCSV(data: any): string {
     if (data.invoices.length > 0) {
         const invoiceKeys = Object.keys(data.invoices[0])
         lines.push(invoiceKeys.join(','))
-        data.invoices.forEach((inv: any) => {
-            lines.push(invoiceKeys.map(k => `"${String(inv[k] || '').replace(/"/g, '""')}"`).join(','))
+        data.invoices.forEach((inv) => {
+            lines.push(invoiceKeys.map(k => `"${String(inv[k] ?? '').replace(/"/g, '""')}"`).join(','))
         })
     } else {
         lines.push('No invoices found')
@@ -205,8 +226,8 @@ function generateCSV(data: any): string {
     if (data.tasks.length > 0) {
         const taskKeys = Object.keys(data.tasks[0])
         lines.push(taskKeys.join(','))
-        data.tasks.forEach((task: any) => {
-            lines.push(taskKeys.map(k => `"${String(task[k] || '').replace(/"/g, '""')}"`).join(','))
+        data.tasks.forEach((task) => {
+            lines.push(taskKeys.map(k => `"${String(task[k] ?? '').replace(/"/g, '""')}"`).join(','))
         })
     } else {
         lines.push('No tasks found')
@@ -218,8 +239,8 @@ function generateCSV(data: any): string {
     if (data.projects.length > 0) {
         const projKeys = Object.keys(data.projects[0])
         lines.push(projKeys.join(','))
-        data.projects.forEach((proj: any) => {
-            lines.push(projKeys.map(k => `"${String(proj[k] || '').replace(/"/g, '""')}"`).join(','))
+        data.projects.forEach((proj) => {
+            lines.push(projKeys.map(k => `"${String(proj[k] ?? '').replace(/"/g, '""')}"`).join(','))
         })
     } else {
         lines.push('No projects found')
@@ -231,8 +252,8 @@ function generateCSV(data: any): string {
     if (data.activity_history.length > 0) {
         const actKeys = Object.keys(data.activity_history[0])
         lines.push(actKeys.join(','))
-        data.activity_history.forEach((act: any) => {
-            lines.push(actKeys.map(k => `"${String(act[k] || '').replace(/"/g, '""')}"`).join(','))
+        data.activity_history.forEach((act) => {
+            lines.push(actKeys.map(k => `"${String(act[k] ?? '').replace(/"/g, '""')}"`).join(','))
         })
     } else {
         lines.push('No activity history found')

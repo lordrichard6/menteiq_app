@@ -5,6 +5,8 @@ import { useContactStore } from '@/stores/contact-store'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Trash2 } from 'lucide-react'
+import { format } from 'date-fns'
+import { toast } from 'sonner'
 
 interface NotesSectionProps {
     contactId: string
@@ -15,26 +17,26 @@ export function NotesSection({ contactId, notes }: NotesSectionProps) {
     const [newNote, setNewNote] = useState('')
     const { updateContact } = useContactStore()
 
-    const handleAddNote = () => {
-        if (newNote.trim()) {
-            // Format: DD-MM-YYYY HH:mm (24-hour format)
-            const now = new Date()
-            const day = String(now.getDate()).padStart(2, '0')
-            const month = String(now.getMonth() + 1).padStart(2, '0')
-            const year = now.getFullYear()
-            const hours = String(now.getHours()).padStart(2, '0')
-            const minutes = String(now.getMinutes()).padStart(2, '0')
-            const timestamp = `${day}-${month}-${year} ${hours}:${minutes}`
+    const handleAddNote = async () => {
+        if (!newNote.trim()) return
 
-            const noteWithTimestamp = `${timestamp} - ${newNote.trim()}`
-            updateContact(contactId, { notes: [noteWithTimestamp, ...notes] })
+        const timestamp = format(new Date(), 'dd-MM-yyyy HH:mm')
+        const noteWithTimestamp = `${timestamp} - ${newNote.trim()}`
+        try {
+            await updateContact(contactId, { notes: [noteWithTimestamp, ...notes] })
             setNewNote('')
+        } catch {
+            toast.error('Failed to save note. Please try again.')
         }
     }
 
-    const handleDeleteNote = (index: number) => {
+    const handleDeleteNote = async (index: number) => {
         const updatedNotes = notes.filter((_, i) => i !== index)
-        updateContact(contactId, { notes: updatedNotes })
+        try {
+            await updateContact(contactId, { notes: updatedNotes })
+        } catch {
+            toast.error('Failed to delete note. Please try again.')
+        }
     }
 
     return (

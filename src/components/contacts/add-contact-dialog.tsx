@@ -23,9 +23,8 @@ import {
 import { useContactStore } from '@/stores/contact-store'
 import { ContactStatus, STATUS_LABELS } from '@/types/contact'
 import { UserPlus, Loader2, AlertCircle } from 'lucide-react'
-import { emailRegex, isValidEmail, isValidPhone, formatPhone } from '@/lib/validation/contact'
+import { isValidEmail, isValidPhone, formatPhone } from '@/lib/validation/contact'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Phone } from 'lucide-react'
 
 export function AddContactDialog() {
     const [open, setOpen] = useState(false)
@@ -113,8 +112,8 @@ export function AddContactDialog() {
                 setStatus('lead')
                 setOpen(false)
             }
-        } catch (err: any) {
-            setEmailError(err.message)
+        } catch (err: unknown) {
+            setEmailError(err instanceof Error ? err.message : 'An error occurred')
         } finally {
             setIsSubmitting(false)
         }

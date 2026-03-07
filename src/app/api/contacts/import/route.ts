@@ -42,11 +42,18 @@ export async function POST(request: NextRequest) {
     }
 
     // Transform contacts based on column mapping
-    const mappedContacts = contacts.map((row: any) => {
-      const mapped: any = {}
-      Object.entries(columnMapping).forEach(([sourceCol, targetField]) => {
-        if (targetField !== 'skip') {
-          mapped[targetField as string] = row[sourceCol]
+    const mappedContacts = contacts.map((row: Record<string, unknown>) => {
+      const mapped: Record<string, unknown> = {}
+      Object.entries(columnMapping as Record<string, string>).forEach(([sourceCol, targetField]) => {
+        if (targetField === 'skip') return
+
+        if (targetField === 'fullName') {
+          // Split "John Doe" → firstName: "John", lastName: "Doe"
+          const parts = String(row[sourceCol] || '').trim().split(/\s+/)
+          mapped['firstName'] = parts[0] || ''
+          mapped['lastName'] = parts.slice(1).join(' ') || ''
+        } else {
+          mapped[targetField] = row[sourceCol]
         }
       })
       return mapped
@@ -130,12 +137,13 @@ export async function POST(request: NextRequest) {
       contacts: insertedContacts
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('Import error:', error)
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error.message
+        details: message
       },
       { status: 500 }
     )
@@ -192,7 +200,7 @@ export async function GET(request: NextRequest) {
       duplicates: existingContacts || []
     })
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Duplicate check error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

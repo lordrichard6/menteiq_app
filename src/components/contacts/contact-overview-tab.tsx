@@ -76,7 +76,7 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                     </CardHeader>
                     <CardContent>
                         {isLoadingStats ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" aria-label="Loading total revenue" />
                         ) : (
                             <div className="text-2xl font-bold text-[#3D4A67]">
                                 CHF {stats.totalRevenue.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
@@ -91,7 +91,7 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                     </CardHeader>
                     <CardContent>
                         {isLoadingStats ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" aria-label="Loading open invoices" />
                         ) : (
                             <div className="text-2xl font-bold text-[#3D4A67]">
                                 {stats.openInvoices}
@@ -106,7 +106,7 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                     </CardHeader>
                     <CardContent>
                         {isLoadingStats ? (
-                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" aria-label="Loading active projects" />
                         ) : (
                             <div className="text-2xl font-bold text-[#3D4A67]">
                                 {stats.activeProjects}

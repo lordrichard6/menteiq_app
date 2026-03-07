@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Upload, FileSpreadsheet, File, X, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react'
+import { Upload, FileSpreadsheet, File, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,7 +21,7 @@ type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete'
 
 interface ParsedData {
   headers: string[]
-  rows: any[]
+  rows: Record<string, unknown>[]
   fileName: string
   fileType: 'csv' | 'xlsx' | 'vcf'
 }
@@ -30,6 +30,7 @@ interface ParsedData {
 const ORBITCRM_FIELDS = [
   { value: 'firstName', label: 'First Name', required: true },
   { value: 'lastName', label: 'Last Name', required: false },
+  { value: 'fullName', label: 'Full Name (auto-split)', required: false },
   { value: 'companyName', label: 'Company Name', required: false },
   { value: 'email', label: 'Email', required: true },
   { value: 'phone', label: 'Phone', required: false },
@@ -52,7 +53,7 @@ function autoDetectMapping(headers: string[]): ColumnMapping {
     } else if (lowerHeader === 'last name' || lowerHeader === 'family name' || lowerHeader === 'lname') {
       mapping[header] = 'lastName'
     } else if (lowerHeader === 'name' || lowerHeader === 'full name' || lowerHeader === 'contact') {
-      mapping[header] = 'firstName' // Default to first name if single name column
+      mapping[header] = 'fullName' // Will be split into firstName + lastName at import time
     } else if (lowerHeader.includes('email') || lowerHeader === 'e-mail') {
       mapping[header] = 'email'
     } else if (lowerHeader.includes('phone') || lowerHeader.includes('mobile') || lowerHeader.includes('tel')) {
@@ -81,7 +82,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
   const [importResult, setImportResult] = useState<{
     imported: number
     skipped: number
-    duplicates: any[]
+    duplicates: { row: number; email: string }[]
   } | null>(null)
   const [validationErrors, setValidationErrors] = useState<{ row: number, errors: { field: string, message: string }[] }[]>([])
 
@@ -139,11 +140,12 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
           return
         }
 
-        const headers = (jsonData[0] as any[]).map(String)
-        const rows = jsonData.slice(1).map((row: any) => {
-          const obj: any = {}
+        const headers = (jsonData[0] as unknown[]).map(String)
+        const rows = jsonData.slice(1).map((row: unknown) => {
+          const obj: Record<string, unknown> = {}
+          const rowArr = row as unknown[]
           headers.forEach((header, index) => {
-            obj[header] = row[index] || ''
+            obj[header] = rowArr[index] ?? ''
           })
           return obj
         })
@@ -160,8 +162,8 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
         // TODO: Implement vCard parsing
         setError('vCard import coming soon. Please use CSV or Excel for now.')
       }
-    } catch (err: any) {
-      setError(`Failed to parse file: ${err.message}`)
+    } catch (err: unknown) {
+      setError(`Failed to parse file: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }, [])
 
@@ -197,7 +199,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
     if (!parsedData) return []
 
     return parsedData.rows.slice(0, 50).map(row => {
-      const mapped: any = {}
+      const mapped: Record<string, unknown> = {}
       Object.entries(columnMapping).forEach(([sourceCol, targetField]) => {
         if (targetField !== 'skip') {
           mapped[targetField] = row[sourceCol]
@@ -247,10 +249,9 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
       const result = await response.json()
 
       if (!response.ok) {
-        const errorData = result
-        const error = new Error(result.error || 'Import failed') as any
-        error.details = result.details
-        throw error
+        const importError = new Error(result.error || 'Import failed')
+        ;(importError as Error & { details?: unknown }).details = result.details
+        throw importError
       }
 
       setImportResult({
@@ -260,11 +261,13 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
       })
 
       setStep('complete')
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Import error:', err)
-      setError(err.message || 'Failed to import contacts')
-      if (err.details?.errors) {
-        setValidationErrors(err.details.errors)
+      const errMsg = err instanceof Error ? err.message : 'Failed to import contacts'
+      setError(errMsg)
+      const errWithDetails = err as Error & { details?: { errors?: { row: number, errors: { field: string, message: string }[] }[] } }
+      if (errWithDetails.details?.errors) {
+        setValidationErrors(errWithDetails.details.errors)
       }
       setStep('preview')
     }
@@ -390,7 +393,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
             <div>
               <h3 className="text-lg font-medium mb-2">Map Your Columns</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Match your file's columns to MenteIQ fields. Required fields: First Name and Email
+                Match your file&apos;s columns to MenteIQ fields. Required fields: First Name and Email
               </p>
 
               <div className="border rounded-lg overflow-x-auto w-full">

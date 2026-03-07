@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { createClient } from '@/lib/supabase/client'
 import { Shield, Check, X, Clock, History } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
+import { toast } from 'sonner'
 
 interface ConsentManagementProps {
     contactId: string
@@ -90,7 +91,7 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
                 p_notes: 'Updated via admin panel',
             })
 
-            alert('Consent preferences updated successfully')
+            toast.success('Consent preferences updated successfully')
 
             // Reload history if it's showing
             if (showHistory) {
@@ -98,7 +99,7 @@ export function ConsentManagement({ contactId, currentConsent }: ConsentManageme
             }
         } catch (error) {
             console.error('Failed to update consent:', error)
-            alert('Failed to update consent preferences')
+            toast.error('Failed to update consent preferences')
         } finally {
             setIsSaving(false)
         }

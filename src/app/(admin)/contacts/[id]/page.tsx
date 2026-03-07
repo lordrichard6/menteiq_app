@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Checkbox } from '@/components/ui/checkbox'
-import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle, SearchX } from 'lucide-react'
 import Link from 'next/link'
 import { TagsInput } from '@/components/contacts/tags-input'
 import { NotesSection } from '@/components/contacts/notes-section'
@@ -141,11 +141,27 @@ export default function ContactDetailPage() {
         setShowExportMenu(false)
     }
 
-    if (isLoading || !contact) {
+    if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[50vh]">
                 <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
                 <span className="ml-2 text-slate-500">Loading contact...</span>
+            </div>
+        )
+    }
+
+    if (!contact) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+                <SearchX className="h-16 w-16 text-slate-300 mb-4" />
+                <h2 className="text-xl font-semibold text-slate-700 mb-2">Contact not found</h2>
+                <p className="text-slate-500 mb-6">This contact may have been deleted or you don&apos;t have access.</p>
+                <Link href="/contacts">
+                    <Button variant="outline" className="border-slate-300">
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        Back to Contacts
+                    </Button>
+                </Link>
             </div>
         )
     }

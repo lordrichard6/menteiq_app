@@ -349,9 +349,23 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
 
         try {
             const supabase = createClient()
+
+            // Scope duplicate check to the current tenant only
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return null
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('tenant_id')
+                .eq('id', user.id)
+                .single()
+
+            if (!profile?.tenant_id) return null
+
             let query = supabase
                 .from('contacts')
                 .select('*')
+                .eq('tenant_id', profile.tenant_id)
                 .is('archived_at', null)
 
             if (excludeId) {

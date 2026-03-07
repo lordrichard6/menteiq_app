@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from "react"
-import { Contact, ContactStatus, STATUS_LABELS } from "@/types/contact"
+import { useState } from "react"
+import { Contact, STATUS_LABELS } from "@/types/contact"
 import {
     Dialog,
     DialogContent,
@@ -44,22 +44,8 @@ export function MergeContactsDialog({ open, onOpenChange, contacts }: MergeConta
         }
     })
 
-    // Reset state when contacts change and dialog opens
-    useEffect(() => {
-        if (open && contacts.length === 2) {
-            const first = contacts[0]
-            setPrimaryId(prev => prev === first.id ? prev : first.id)
-            setMergedData({
-                firstName: first.firstName,
-                lastName: first.lastName,
-                isCompany: first.isCompany,
-                companyName: first.companyName,
-                email: first.email,
-                phone: first.phone,
-                status: first.status,
-            })
-        }
-    }, [contacts, open])
+    // No reset effect needed — parent passes key={contactIds} so this component
+    // remounts whenever the selected contact pair changes, resetting all state.
 
     if (contacts.length !== 2) return null
 
@@ -98,13 +84,13 @@ export function MergeContactsDialog({ open, onOpenChange, contacts }: MergeConta
                     className={`p-2 rounded-md cursor-pointer border transition-colors ${currentVal === valA ? 'border-[#3D4A67] bg-[#3D4A67]/5' : 'border-slate-200 hover:border-slate-300'}`}
                     onClick={() => handleFieldSelect(field, valA, contactA.id)}
                 >
-                    <div className="text-sm break-all">{valA as string || '-'}</div>
+                    <div className="text-sm break-all">{String(valA ?? '') || '-'}</div>
                 </div>
                 <div
                     className={`p-2 rounded-md cursor-pointer border transition-colors ${currentVal === valB ? 'border-[#3D4A67] bg-[#3D4A67]/5' : 'border-slate-200 hover:border-slate-300'}`}
                     onClick={() => handleFieldSelect(field, valB, contactB.id)}
                 >
-                    <div className="text-sm break-all">{valB as string || '-'}</div>
+                    <div className="text-sm break-all">{String(valB ?? '') || '-'}</div>
                 </div>
             </div>
         )

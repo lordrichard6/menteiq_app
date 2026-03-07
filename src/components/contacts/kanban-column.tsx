@@ -18,7 +18,12 @@ export function KanbanColumn({ id, contacts, onDeleteContact }: KanbanColumnProp
     const columnContacts = contacts.filter((contact) => contact.status === id)
 
     return (
-        <div ref={setNodeRef} className="flex-1 min-w-[300px] h-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-100 p-2">
+        <div
+            ref={setNodeRef}
+            role="region"
+            aria-label={`${STATUS_LABELS[id]} column — ${columnContacts.length} contact${columnContacts.length !== 1 ? 's' : ''}`}
+            className="flex-1 min-w-[300px] h-full flex flex-col bg-slate-50/50 rounded-lg border border-slate-100 p-2"
+        >
             <div className="flex items-center justify-between px-2 py-3 mb-2">
                 <h3 className="font-medium text-slate-700">{STATUS_LABELS[id]}</h3>
                 <Badge variant="outline" className={`${STATUS_COLORS[id]} border-0 font-medium`}>

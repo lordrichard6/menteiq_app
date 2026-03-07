@@ -19,7 +19,8 @@ export function TagsInput({ contactId, tags }: TagsInputProps) {
         if (e.key === 'Enter' && inputValue.trim()) {
             e.preventDefault()
             const newTag = inputValue.trim()
-            if (!tags.includes(newTag)) {
+            const isDuplicate = tags.some(t => t.toLowerCase() === newTag.toLowerCase())
+            if (!isDuplicate) {
                 updateContact(contactId, { tags: [...tags, newTag] })
             }
             setInputValue('')
