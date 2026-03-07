@@ -39,8 +39,11 @@ interface SupabaseEmailHookPayload {
 
 /**
  * Verify the Supabase hook signature (HMAC-SHA256).
- * Supabase signs the raw body with the hook secret and passes it in
- * the `x-supabase-signature` header as a hex-encoded HMAC.
+ *
+ * Supabase sends the signature in the Authorization header as:
+ *   Authorization: v1,<hex-encoded HMAC-SHA256 of raw body>
+ *
+ * The HMAC key is the raw bytes of SEND_EMAIL_HOOK_SECRET (hex string).
  */
 async function verifySignature(req: NextRequest, rawBody: string): Promise<boolean> {
   const secret = process.env.SEND_EMAIL_HOOK_SECRET
@@ -49,16 +52,24 @@ async function verifySignature(req: NextRequest, rawBody: string): Promise<boole
     return true
   }
 
-  const signature = req.headers.get('x-supabase-signature')
-  if (!signature) return false
+  // Supabase sends: Authorization: v1,<hex_hmac>
+  const authHeader = req.headers.get('authorization') ?? ''
+  if (!authHeader.startsWith('v1,')) {
+    console.error('[send-email hook] Missing or malformed Authorization header:', authHeader)
+    return false
+  }
 
-  const encoder = new TextEncoder()
-  const keyData = encoder.encode(secret)
-  const messageData = encoder.encode(rawBody)
+  const receivedHex = authHeader.slice(3) // strip "v1,"
+
+  // The key is the raw bytes of the hex secret
+  const keyBytes = new Uint8Array(
+    secret.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+  )
+  const messageData = new TextEncoder().encode(rawBody)
 
   const cryptoKey = await crypto.subtle.importKey(
     'raw',
-    keyData,
+    keyBytes,
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign']
@@ -70,10 +81,10 @@ async function verifySignature(req: NextRequest, rawBody: string): Promise<boole
     .join('')
 
   // Constant-time comparison
-  if (expectedHex.length !== signature.length) return false
+  if (expectedHex.length !== receivedHex.length) return false
   let diff = 0
   for (let i = 0; i < expectedHex.length; i++) {
-    diff |= expectedHex.charCodeAt(i) ^ signature.charCodeAt(i)
+    diff |= expectedHex.charCodeAt(i) ^ receivedHex.charCodeAt(i)
   }
   return diff === 0
 }
