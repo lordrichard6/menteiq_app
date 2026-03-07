@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -38,7 +38,7 @@ interface ActivityEntry {
     entity_id: string
     entity_name?: string
     description?: string
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
     created_at: string
     user_name?: string
     user_avatar?: string
@@ -85,11 +85,7 @@ export function ActivityTimeline({ contactId }: ActivityTimelineProps) {
     const [isLoading, setIsLoading] = useState(true)
     const [filter, setFilter] = useState<EventType | 'all'>('all')
 
-    useEffect(() => {
-        loadActivities()
-    }, [contactId])
-
-    async function loadActivities() {
+    const loadActivities = useCallback(async () => {
         setIsLoading(true)
         try {
             const data = await getEntityActivity('contact', contactId)
@@ -99,7 +95,11 @@ export function ActivityTimeline({ contactId }: ActivityTimelineProps) {
         } finally {
             setIsLoading(false)
         }
-    }
+    }, [contactId])
+
+    useEffect(() => {
+        loadActivities()
+    }, [loadActivities])
 
     const filteredActivities = filter === 'all'
         ? activities
@@ -187,15 +187,15 @@ export function ActivityTimeline({ contactId }: ActivityTimelineProps) {
                                                 </p>
                                                 {activity.metadata && Object.keys(activity.metadata).length > 0 && (
                                                     <div className="mt-2 text-xs text-slate-500 space-y-1">
-                                                        {activity.metadata.subject && (
-                                                            <div>Subject: {activity.metadata.subject}</div>
+                                                        {Boolean(activity.metadata.subject) && (
+                                                            <div>Subject: {String(activity.metadata.subject)}</div>
                                                         )}
-                                                        {activity.metadata.duration && (
-                                                            <div>Duration: {activity.metadata.duration} minutes</div>
+                                                        {Boolean(activity.metadata.duration) && (
+                                                            <div>Duration: {String(activity.metadata.duration)} minutes</div>
                                                         )}
-                                                        {activity.metadata.amount && (
+                                                        {Boolean(activity.metadata.amount) && (
                                                             <div>
-                                                                Amount: {activity.metadata.currency} {activity.metadata.amount}
+                                                                Amount: {String(activity.metadata.currency)} {String(activity.metadata.amount)}
                                                             </div>
                                                         )}
                                                     </div>

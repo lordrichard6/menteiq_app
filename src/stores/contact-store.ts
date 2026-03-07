@@ -2,17 +2,24 @@ import { create } from 'zustand'
 import { Contact, CreateContactInput, ContactStatus } from '@/types/contact'
 import { createClient } from '@/lib/supabase/client'
 import { toE164 } from '@/lib/validation/contact'
+import { toast } from 'sonner'
+import { ActivityLogger } from '@/lib/activity-log'
 
 export interface ContactFilters {
     search: string
     status: ContactStatus | 'all'
     statuses: ContactStatus[]
     tags: string[]
+    showArchived?: boolean
 }
 
 interface ContactStore {
     contacts: Contact[]
+    allContacts: Contact[]
+    allTags: string[]
+    statusCounts: Record<ContactStatus, number>
     isLoading: boolean
+    isLoadingKanban: boolean
     error: string | null
     currentPage: number
     pageSize: number
@@ -27,6 +34,9 @@ interface ContactStore {
 
     // Actions
     fetchContacts: () => Promise<void>
+    fetchAllContactsForKanban: () => Promise<void>
+    fetchAllTags: () => Promise<void>
+    fetchStatusCounts: () => Promise<void>
     setPage: (page: number) => void
     setPageSize: (size: number) => void
     setFilters: (filters: Partial<ContactFilters>) => void
@@ -34,7 +44,9 @@ interface ContactStore {
     addContact: (input: CreateContactInput) => Promise<Contact | null>
     updateContact: (id: string, updates: Partial<Contact>) => Promise<void>
     deleteContact: (id: string) => Promise<void>
+    restoreContact: (id: string) => Promise<void>
     updateStatus: (id: string, status: ContactStatus) => Promise<void>
+    bulkUpdateStatus: (ids: string[], status: ContactStatus) => Promise<void>
     getContact: (id: string) => Contact | undefined
     fetchContactById: (id: string) => Promise<Contact | null>
     toggleColumn: (columnId: string) => void
@@ -48,25 +60,38 @@ interface ContactStore {
     setVisibleColumns: (columns: string[]) => void
 }
 
+const COLUMN_STORAGE_KEY = 'menteiq_contact_columns'
+
 // Helper to convert DB row to Contact type
-function dbToContact(row: any): Contact {
+function dbToContact(row: Record<string, unknown>): Contact {
     return {
-        id: row.id,
-        firstName: row.first_name || '',
-        lastName: row.last_name || '',
-        isCompany: row.is_company || false,
-        companyName: row.company_name,
-        email: row.email || '',
-        phone: row.phone,
-        status: row.status || 'lead',
-        tags: row.tags || [],
-        notes: row.notes ? row.notes.split('\n').filter(Boolean) : [],
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
-        portal_enabled: row.portal_enabled,
-        portal_token: row.portal_token,
-        portal_invited_at: row.portal_invited_at,
-        last_portal_login: row.last_portal_login,
+        id: row.id as string,
+        firstName: (row.first_name as string) || '',
+        lastName: (row.last_name as string) || '',
+        isCompany: (row.is_company as boolean) || false,
+        companyName: row.company_name as string | undefined,
+        email: (row.email as string) || '',
+        phone: row.phone as string | undefined,
+        // Address fields
+        addressLine1: row.address_line1 as string | undefined,
+        addressLine2: row.address_line2 as string | undefined,
+        city: row.city as string | undefined,
+        postalCode: row.postal_code as string | undefined,
+        country: row.country as string | undefined,
+        status: (row.status as ContactStatus) || 'lead',
+        tags: (row.tags as string[]) || [],
+        notes: row.notes ? (row.notes as string).split('\n').filter(Boolean) : [],
+        // GDPR / Consent
+        marketingConsent: row.marketing_consent as boolean | undefined,
+        dataProcessingConsent: row.data_processing_consent as boolean | undefined,
+        consentDate: row.consent_date as string | undefined,
+        // Portal access fields
+        portal_enabled: row.portal_enabled as boolean | undefined,
+        portal_token: row.portal_token as string | undefined,
+        portal_invited_at: row.portal_invited_at as Date | string | undefined,
+        last_portal_login: row.last_portal_login as Date | string | undefined,
+        createdAt: new Date(row.created_at as string),
+        updatedAt: new Date(row.updated_at as string),
     }
 }
 
@@ -85,9 +110,20 @@ function contactToDb(input: CreateContactInput) {
     }
 }
 
+// Helper to get display name for a contact
+function getContactName(contact: Contact): string {
+    return contact.isCompany
+        ? (contact.companyName || 'Unknown Company')
+        : `${contact.firstName} ${contact.lastName}`.trim()
+}
+
 export const useContactStore = create<ContactStore>()((set, get) => ({
     contacts: [],
+    allContacts: [],
+    allTags: [],
+    statusCounts: { lead: 0, opportunity: 0, client: 0, churned: 0 },
     isLoading: false,
+    isLoadingKanban: false,
     error: null,
     currentPage: 1,
     pageSize: 50,
@@ -97,12 +133,13 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
         status: 'all',
         statuses: [],
         tags: [],
+        showArchived: false,
     },
     sortConfig: {
         column: 'created_at',
         ascending: false,
     },
-    visibleColumns: ['name', 'email', 'company', 'status', 'actions'],
+    visibleColumns: ['name', 'email', 'phone', 'company', 'status', 'actions'],
     selectedContactIds: [],
 
     fetchContacts: async () => {
@@ -131,18 +168,24 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 .from('contacts')
                 .select('*', { count: 'exact' })
                 .eq('tenant_id', profile.tenant_id)
-                .is('archived_at', null)
+
+            // Archived filter
+            if (filters.showArchived) {
+                query = query.not('archived_at', 'is', null)
+            } else {
+                query = query.is('archived_at', null)
+            }
 
             // Dynamic Filtering
             if (filters.status !== 'all') {
                 query = query.eq('status', filters.status)
             }
 
-            if (filters.statuses.length > 0) {
+            if (filters.statuses && filters.statuses.length > 0) {
                 query = query.in('status', filters.statuses)
             }
 
-            if (filters.tags.length > 0) {
+            if (filters.tags && filters.tags.length > 0) {
                 query = query.contains('tags', filters.tags)
             }
 
@@ -163,15 +206,118 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
 
             if (error) throw error
 
-            const contacts = (data || []).map(dbToContact)
+            const contacts = (data || []).map(row => dbToContact(row as Record<string, unknown>))
             set({
                 contacts,
                 totalCount: count || 0,
-                isLoading: false
+                isLoading: false,
             })
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Error fetching contacts:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: message, isLoading: false })
+        }
+    },
+
+    fetchAllContactsForKanban: async () => {
+        set({ isLoadingKanban: true })
+        try {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('tenant_id')
+                .eq('id', user.id)
+                .single()
+
+            if (!profile?.tenant_id) return
+
+            const { data, error } = await supabase
+                .from('contacts')
+                .select('*')
+                .eq('tenant_id', profile.tenant_id)
+                .is('archived_at', null)
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+
+            const allContacts = (data || []).map(row => dbToContact(row as Record<string, unknown>))
+            set({ allContacts, isLoadingKanban: false })
+        } catch (error: unknown) {
+            console.error('Error fetching all contacts for kanban:', error)
+            set({ isLoadingKanban: false })
+        }
+    },
+
+    fetchAllTags: async () => {
+        try {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('tenant_id')
+                .eq('id', user.id)
+                .single()
+
+            if (!profile?.tenant_id) return
+
+            const { data, error } = await supabase
+                .from('contacts')
+                .select('tags')
+                .eq('tenant_id', profile.tenant_id)
+                .is('archived_at', null)
+
+            if (error) throw error
+
+            const tagSet = new Set<string>()
+            ;(data || []).forEach(row => {
+                const tags = row.tags as string[] | null
+                if (Array.isArray(tags)) {
+                    tags.forEach(t => tagSet.add(t))
+                }
+            })
+
+            set({ allTags: Array.from(tagSet).sort() })
+        } catch (error: unknown) {
+            console.error('Error fetching all tags:', error)
+        }
+    },
+
+    fetchStatusCounts: async () => {
+        try {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return
+
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('tenant_id')
+                .eq('id', user.id)
+                .single()
+
+            if (!profile?.tenant_id) return
+
+            const { data, error } = await supabase
+                .from('contacts')
+                .select('status')
+                .eq('tenant_id', profile.tenant_id)
+                .is('archived_at', null)
+
+            if (error) throw error
+
+            const counts: Record<ContactStatus, number> = { lead: 0, opportunity: 0, client: 0, churned: 0 }
+            ;(data || []).forEach(row => {
+                const s = row.status as ContactStatus
+                if (s in counts) counts[s]++
+            })
+
+            set({ statusCounts: counts })
+        } catch (error: unknown) {
+            console.error('Error fetching status counts:', error)
         }
     },
 
@@ -188,7 +334,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
     setFilters: (newFilters) => {
         set((state) => ({
             filters: { ...state.filters, ...newFilters },
-            currentPage: 1 // Reset to first page
+            currentPage: 1, // Reset to first page
         }))
         get().fetchContacts()
     },
@@ -212,7 +358,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 query = query.neq('id', excludeId)
             }
 
-            const orConditions = []
+            const orConditions: string[] = []
             if (email) orConditions.push(`email.eq.${email}`)
             if (phone) orConditions.push(`phone.eq.${toE164(phone)}`)
 
@@ -224,8 +370,8 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
 
             const { data, error } = await query.limit(1).maybeSingle()
             if (error) throw error
-            return data ? dbToContact(data) : null
-        } catch (error) {
+            return data ? dbToContact(data as Record<string, unknown>) : null
+        } catch (error: unknown) {
             console.error('Error checking duplicate:', error)
             return null
         }
@@ -238,7 +384,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 : [...state.visibleColumns, columnId]
 
             if (typeof window !== 'undefined') {
-                localStorage.setItem('orbit_contact_columns', JSON.stringify(newColumns))
+                localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(newColumns))
             }
 
             return { visibleColumns: newColumns }
@@ -260,7 +406,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             const allSelected = ids.every(id => state.selectedContactIds.includes(id))
             if (allSelected) {
                 return {
-                    selectedContactIds: state.selectedContactIds.filter(id => !ids.includes(id))
+                    selectedContactIds: state.selectedContactIds.filter(id => !ids.includes(id)),
                 }
             } else {
                 const newSelection = new Set([...state.selectedContactIds, ...ids])
@@ -279,7 +425,10 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             if (!primary || !secondary) throw new Error('Contacts not found')
 
             // 1. Prepare merged fields for DB
-            const dbUpdates: Record<string, any> = {
+            const mergedTags = Array.from(new Set([...primary.tags, ...secondary.tags]))
+            const mergedNotes = [...primary.notes, ...secondary.notes].filter(Boolean)
+
+            const dbUpdates: Record<string, unknown> = {
                 first_name: mergedData.firstName,
                 last_name: mergedData.lastName,
                 is_company: mergedData.isCompany,
@@ -287,10 +436,9 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 email: mergedData.email,
                 phone: mergedData.phone || null,
                 status: mergedData.status,
-                tags: Array.from(new Set([...primary.tags, ...secondary.tags])),
-                // Merge notes - simple concatenation for now
-                notes: [...primary.notes, ...secondary.notes].filter(Boolean).join('\n'),
-                updated_at: new Date().toISOString()
+                tags: mergedTags,
+                notes: mergedNotes.join('\n'),
+                updated_at: new Date().toISOString(),
             }
 
             // 2. Update Primary
@@ -307,7 +455,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 .update({
                     archived_at: new Date().toISOString(),
                     updated_at: new Date().toISOString(),
-                    notes: `Merged into ${primary.firstName} ${primary.lastName} (${primaryId})`
+                    notes: `Merged into ${primary.firstName} ${primary.lastName} (${primaryId})`,
                 })
                 .eq('id', secondaryId)
 
@@ -322,8 +470,6 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 ])
             } catch (migrationError) {
                 console.error('Error migrating related data during merge:', migrationError)
-                // We don't throw here to avoid failing the whole merge if one related update fails
-                // but we might want to log this for debugging
             }
 
             // 5. Update local state
@@ -333,18 +479,25 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                     .map(c => c.id === primaryId ? {
                         ...c,
                         ...mergedData,
-                        tags: dbUpdates.tags,
-                        notes: [...primary.notes, ...secondary.notes].filter(Boolean),
-                        updatedAt: new Date()
+                        tags: mergedTags,
+                        notes: mergedNotes,
+                        updatedAt: new Date(),
                     } : c),
                 selectedContactIds: [],
-                isLoading: false
+                isLoading: false,
             }))
 
+            const primaryName = getContactName(primary)
+            const secondaryName = getContactName(secondary)
+            toast.success('Contacts merged', {
+                description: `"${secondaryName}" was merged into "${primaryName}".`,
+            })
+
             return true
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Error merging contacts:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: message, isLoading: false })
             return false
         }
     },
@@ -383,12 +536,20 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
 
             if (error) throw error
 
-            const newContact = dbToContact(data)
+            const newContact = dbToContact(data as Record<string, unknown>)
             set((state) => ({ contacts: [newContact, ...state.contacts] }))
+
+            const name = getContactName(newContact)
+            toast.success('Contact added', { description: `"${name}" was created successfully.` })
+
+            // Log activity (non-blocking)
+            ActivityLogger.contactCreated(newContact.id, name).catch(console.error)
+
             return newContact
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Error adding contact:', error)
-            set({ error: error.message })
+            set({ error: message })
             return null
         }
     },
@@ -399,7 +560,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             const supabase = createClient()
 
             // Build update object
-            const dbUpdates: any = { updated_at: new Date().toISOString() }
+            const dbUpdates: Record<string, unknown> = { updated_at: new Date().toISOString() }
 
             if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName
             if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName
@@ -410,6 +571,12 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             if (updates.status !== undefined) dbUpdates.status = updates.status
             if (updates.tags !== undefined) dbUpdates.tags = updates.tags
             if (updates.notes !== undefined) dbUpdates.notes = updates.notes.join('\n')
+            // Address fields
+            if (updates.addressLine1 !== undefined) dbUpdates.address_line1 = updates.addressLine1
+            if (updates.addressLine2 !== undefined) dbUpdates.address_line2 = updates.addressLine2
+            if (updates.city !== undefined) dbUpdates.city = updates.city
+            if (updates.postalCode !== undefined) dbUpdates.postal_code = updates.postalCode
+            if (updates.country !== undefined) dbUpdates.country = updates.country
 
             const { error } = await supabase
                 .from('contacts')
@@ -423,9 +590,10 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                     c.id === id ? { ...c, ...updates, updatedAt: new Date() } : c
                 ),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Error updating contact:', error)
-            set({ error: error.message })
+            set({ error: message })
         }
     },
 
@@ -434,13 +602,15 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
         try {
             const supabase = createClient()
 
+            const contact = get().contacts.find(c => c.id === id)
+
             // Standard CRM Industry practice: Archiving (Soft Delete)
             // instead of hard delete which would break invoice/project history
             const { error } = await supabase
                 .from('contacts')
                 .update({
                     archived_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
                 })
                 .eq('id', id)
 
@@ -449,14 +619,99 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             set((state) => ({
                 contacts: state.contacts.filter((c) => c.id !== id),
             }))
-        } catch (error: any) {
+
+            const name = contact ? getContactName(contact) : 'Contact'
+            toast.success('Contact archived', { description: `"${name}" was moved to archived.` })
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Error archiving contact:', error)
-            set({ error: error.message })
+            set({ error: message })
+        }
+    },
+
+    restoreContact: async (id) => {
+        set({ error: null })
+        try {
+            const supabase = createClient()
+
+            const contact = get().contacts.find(c => c.id === id)
+
+            const { error } = await supabase
+                .from('contacts')
+                .update({
+                    archived_at: null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', id)
+
+            if (error) throw error
+
+            set((state) => ({
+                contacts: state.contacts.filter((c) => c.id !== id),
+            }))
+
+            const name = contact ? getContactName(contact) : 'Contact'
+            toast.success('Contact restored', { description: `"${name}" is now active again.` })
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
+            console.error('Error restoring contact:', error)
+            set({ error: message })
         }
     },
 
     updateStatus: async (id: string, status: ContactStatus) => {
+        const contact = get().contacts.find(c => c.id === id)
+        const oldStatus = contact?.status
+
         await get().updateContact(id, { status })
+
+        // Also sync allContacts (kanban) immediately
+        set((state) => ({
+            allContacts: state.allContacts.map(c =>
+                c.id === id ? { ...c, status } : c
+            ),
+        }))
+
+        // Log activity (non-blocking)
+        if (contact && oldStatus && oldStatus !== status) {
+            const name = getContactName(contact)
+            ActivityLogger.contactStatusChanged(id, name, oldStatus, status).catch(console.error)
+        }
+    },
+
+    bulkUpdateStatus: async (ids: string[], status: ContactStatus) => {
+        if (!ids.length) return
+
+        set({ isLoading: true, error: null })
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('contacts')
+                .update({
+                    status,
+                    updated_at: new Date().toISOString(),
+                })
+                .in('id', ids)
+
+            if (error) throw error
+
+            set((state) => ({
+                contacts: state.contacts.map(c =>
+                    ids.includes(c.id) ? { ...c, status, updatedAt: new Date() } : c
+                ),
+                selectedContactIds: [],
+                isLoading: false,
+            }))
+
+            toast.success('Status updated', {
+                description: `${ids.length} contact${ids.length !== 1 ? 's' : ''} moved to "${status}".`,
+            })
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
+            console.error('Error bulk updating status:', error)
+            set({ error: message, isLoading: false })
+            throw error
+        }
     },
 
     bulkArchiveContacts: async (ids: string[]) => {
@@ -469,7 +724,7 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
                 .from('contacts')
                 .update({
                     archived_at: new Date().toISOString(),
-                    updated_at: new Date().toISOString()
+                    updated_at: new Date().toISOString(),
                 })
                 .in('id', ids)
 
@@ -478,11 +733,14 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             set((state) => ({
                 contacts: state.contacts.filter(c => !ids.includes(c.id)),
                 selectedContactIds: state.selectedContactIds.filter(id => !ids.includes(id)),
-                isLoading: false
+                isLoading: false,
             }))
-        } catch (error: any) {
+
+            toast.success(`${ids.length} contact${ids.length !== 1 ? 's' : ''} archived`)
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Unknown error'
             console.error('Error bulk archiving contacts:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: message, isLoading: false })
             throw error
         }
     },
@@ -503,11 +761,8 @@ export const useContactStore = create<ContactStore>()((set, get) => ({
             if (error) throw error
             if (!data) return null
 
-            const contact = dbToContact(data)
-            // Optionally update the store if the contact is already there or to cache it
-            // For now just return it
-            return contact
-        } catch (error) {
+            return dbToContact(data as Record<string, unknown>)
+        } catch (error: unknown) {
             console.error('Error fetching individual contact:', error)
             return null
         }

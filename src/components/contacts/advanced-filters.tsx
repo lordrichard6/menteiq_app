@@ -15,14 +15,7 @@ import { STATUS_LABELS, ContactStatus } from "@/types/contact"
 import { Badge } from "@/components/ui/badge"
 
 export function AdvancedFilters() {
-    const { contacts, filters, setFilters } = useContactStore()
-
-    // Get all unique tags from contacts
-    const allTagsArray = contacts.reduce((acc, contact) => {
-        contact.tags.forEach(tag => acc.add(tag))
-        return acc
-    }, new Set<string>())
-    const allTags = Array.from(allTagsArray).sort()
+    const { allTags, filters, setFilters } = useContactStore()
 
     const activeFilterCount =
         (filters.statuses?.length || 0) +

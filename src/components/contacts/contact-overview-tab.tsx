@@ -8,9 +8,9 @@ import { useProjectStore } from '@/stores/project-store'
 import { PortalAccessSection } from './portal-access-section'
 import { ActivityTimeline } from './activity-timeline'
 import { ConsentManagement } from './consent-management'
-import { Mail, Phone, Building2, Plus, FileText, FolderKanban, CheckSquare } from 'lucide-react'
+import { Mail, Phone, Building2, FileText, FolderKanban, CheckSquare, MapPin, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 interface ContactOverviewTabProps {
     contact: Contact
@@ -19,7 +19,21 @@ interface ContactOverviewTabProps {
 export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
     const router = useRouter()
     const invoices = useInvoiceStore((state) => state.invoices)
+    const isLoadingInvoices = useInvoiceStore((state) => state.isLoading)
+    const fetchInvoices = useInvoiceStore((state) => state.fetchInvoices)
     const projects = useProjectStore((state) => state.projects)
+    const isLoadingProjects = useProjectStore((state) => state.isLoading)
+    const fetchProjects = useProjectStore((state) => state.fetchProjects)
+
+    // Ensure related stores are loaded for accurate stats
+    useEffect(() => {
+        if (invoices.length === 0 && !isLoadingInvoices) {
+            fetchInvoices()
+        }
+        if (projects.length === 0 && !isLoadingProjects) {
+            fetchProjects()
+        }
+    }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
     // Calculate stats
     const stats = useMemo(() => {
@@ -41,6 +55,17 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
         return { totalRevenue, openInvoices, activeProjects }
     }, [invoices, projects, contact.id])
 
+    const isLoadingStats = isLoadingInvoices || isLoadingProjects
+
+    // Build address string for display
+    const addressParts = [
+        contact.addressLine1,
+        contact.addressLine2,
+        [contact.postalCode, contact.city].filter(Boolean).join(' '),
+        contact.country,
+    ].filter(Boolean)
+    const hasAddress = addressParts.length > 0
+
     return (
         <div className="space-y-6">
             {/* Quick Stats */}
@@ -50,9 +75,13 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                         <CardTitle className="text-sm font-medium text-slate-600">Total Revenue</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-[#3D4A67]">
-                            CHF {stats.totalRevenue.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
-                        </div>
+                        {isLoadingStats ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        ) : (
+                            <div className="text-2xl font-bold text-[#3D4A67]">
+                                CHF {stats.totalRevenue.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -61,9 +90,13 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                         <CardTitle className="text-sm font-medium text-slate-600">Open Invoices</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-[#3D4A67]">
-                            {stats.openInvoices}
-                        </div>
+                        {isLoadingStats ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        ) : (
+                            <div className="text-2xl font-bold text-[#3D4A67]">
+                                {stats.openInvoices}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
@@ -72,9 +105,13 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                         <CardTitle className="text-sm font-medium text-slate-600">Active Projects</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-[#3D4A67]">
-                            {stats.activeProjects}
-                        </div>
+                        {isLoadingStats ? (
+                            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                        ) : (
+                            <div className="text-2xl font-bold text-[#3D4A67]">
+                                {stats.activeProjects}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -112,7 +149,7 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                     <div className="border-t border-slate-100 pt-4 space-y-3">
                         {contact.email && (
                             <div className="flex items-center gap-3">
-                                <Mail className="h-4 w-4 text-slate-500" />
+                                <Mail className="h-4 w-4 text-slate-500 shrink-0" />
                                 <a href={`mailto:${contact.email}`} className="text-slate-700 hover:text-[#3D4A67]">
                                     {contact.email}
                                 </a>
@@ -120,7 +157,7 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                         )}
                         {contact.phone && (
                             <div className="flex items-center gap-3">
-                                <Phone className="h-4 w-4 text-slate-500" />
+                                <Phone className="h-4 w-4 text-slate-500 shrink-0" />
                                 <a href={`tel:${contact.phone}`} className="text-slate-700 hover:text-[#3D4A67]">
                                     {contact.phone}
                                 </a>
@@ -128,8 +165,18 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                         )}
                         {!contact.isCompany && contact.companyName && (
                             <div className="flex items-center gap-3">
-                                <Building2 className="h-4 w-4 text-slate-500" />
+                                <Building2 className="h-4 w-4 text-slate-500 shrink-0" />
                                 <span className="text-slate-700">{contact.companyName}</span>
+                            </div>
+                        )}
+                        {hasAddress && (
+                            <div className="flex items-start gap-3">
+                                <MapPin className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
+                                <div className="text-sm text-slate-700 space-y-0.5">
+                                    {addressParts.map((part, i) => (
+                                        <div key={i}>{part}</div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -143,10 +190,10 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
             <ConsentManagement
                 contactId={contact.id}
                 currentConsent={{
-                    marketing_consent: (contact as any).marketing_consent,
-                    data_processing_consent: (contact as any).data_processing_consent,
-                    consent_date: (contact as any).consent_date,
-                    privacy_policy_version: (contact as any).privacy_policy_version,
+                    marketing_consent: contact.marketingConsent,
+                    data_processing_consent: contact.dataProcessingConsent,
+                    consent_date: contact.consentDate,
+                    privacy_policy_version: undefined,
                 }}
             />
 

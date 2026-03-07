@@ -50,7 +50,7 @@ export function KanbanCard({ contact, onDelete }: KanbanCardProps) {
                             <h4 className="font-medium text-sm text-[#3D4A67] line-clamp-1">
                                 {contact.isCompany ? contact.companyName : `${contact.firstName} ${contact.lastName}`}
                             </h4>
-                            {contact.companyName && (
+                            {!contact.isCompany && contact.companyName && (
                                 <div className="flex items-center text-xs text-slate-500 mt-1">
                                     <Building2 className="h-3 w-3 mr-1" />
                                     <span className="line-clamp-1">{contact.companyName}</span>

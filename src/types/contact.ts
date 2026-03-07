@@ -10,16 +10,26 @@ export interface Contact {
     companyName?: string
     email: string
     phone?: string
+    // Address fields (from DB)
+    addressLine1?: string
+    addressLine2?: string
+    city?: string
+    postalCode?: string
+    country?: string
     status: ContactStatus
     tags: string[]
     notes: string[]
-    createdAt: Date
-    updatedAt: Date
+    // GDPR / Consent
+    marketingConsent?: boolean
+    dataProcessingConsent?: boolean
+    consentDate?: string
     // Portal access fields
     portal_enabled?: boolean
     portal_token?: string
     portal_invited_at?: Date | string
     last_portal_login?: Date | string
+    createdAt: Date
+    updatedAt: Date
 }
 
 export interface CreateContactInput {

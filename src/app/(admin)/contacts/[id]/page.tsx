@@ -3,11 +3,11 @@
 import { useContactStore } from '@/stores/contact-store'
 import { Contact, ContactStatus, STATUS_LABELS, STATUS_COLORS } from '@/types/contact'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ArrowLeft, Edit, Trash2, Loader2, Download, AlertTriangle } from 'lucide-react'
@@ -29,6 +29,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { toast } from 'sonner'
 
 export default function ContactDetailPage() {
     const params = useParams()
@@ -39,7 +40,6 @@ export default function ContactDetailPage() {
     const contacts = useContactStore((state) => state.contacts)
     const updateStatus = useContactStore((state) => state.updateStatus)
     const deleteContact = useContactStore((state) => state.deleteContact)
-    const fetchContacts = useContactStore((state) => state.fetchContacts)
     const fetchContactById = useContactStore((state) => state.fetchContactById)
     const isLoadingStore = useContactStore((state) => state.isLoading)
 
@@ -50,6 +50,21 @@ export default function ContactDetailPage() {
     const [showExportMenu, setShowExportMenu] = useState(false)
     const [gdprDelete, setGdprDelete] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+
+    // Ref for click-outside detection on the export dropdown
+    const exportMenuRef = useRef<HTMLDivElement>(null)
+
+    // Close export menu when clicking outside
+    useEffect(() => {
+        if (!showExportMenu) return
+        const handler = (e: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+                setShowExportMenu(false)
+            }
+        }
+        document.addEventListener('mousedown', handler)
+        return () => document.removeEventListener('mousedown', handler)
+    }, [showExportMenu])
 
     useEffect(() => {
         const loadContact = async () => {
@@ -94,18 +109,25 @@ export default function ContactDetailPage() {
                     a.click()
                     URL.revokeObjectURL(url)
 
+                    toast.success('Contact permanently deleted', {
+                        description: 'A deletion certificate has been downloaded for GDPR compliance.',
+                    })
                     router.push('/contacts')
                 } else {
-                    alert('Failed to delete contact: ' + data.error)
+                    toast.error('Failed to delete contact', {
+                        description: data.error || 'An unexpected error occurred.',
+                    })
                 }
             } else {
-                // Regular deletion
+                // Regular soft delete (archive)
                 await deleteContact(contactId)
                 router.push('/contacts')
             }
         } catch (error) {
             console.error('Delete error:', error)
-            alert('Failed to delete contact')
+            toast.error('Failed to delete contact', {
+                description: 'An unexpected error occurred. Please try again.',
+            })
         } finally {
             setIsDeleting(false)
             setShowDeleteDialog(false)
@@ -121,7 +143,7 @@ export default function ContactDetailPage() {
 
     if (isLoading || !contact) {
         return (
-            <div className="flex items-center justify-center min-h-screen">
+            <div className="flex items-center justify-center min-h-[50vh]">
                 <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
                 <span className="ml-2 text-slate-500">Loading contact...</span>
             </div>
@@ -150,21 +172,21 @@ export default function ContactDetailPage() {
             {/* Contact Header */}
             <Card className="border-slate-200 bg-white shadow-sm">
                 <CardContent className="pt-6">
-                    <div className="flex items-start justify-between">
+                    <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
                         <div className="flex items-start gap-4">
                             {/* Avatar */}
-                            <div className="h-16 w-16 rounded-full bg-[#3D4A67] text-white flex items-center justify-center text-xl font-semibold">
+                            <div className="h-16 w-16 rounded-full bg-[#3D4A67] text-white flex items-center justify-center text-xl font-semibold shrink-0">
                                 {initials}
                             </div>
 
                             {/* Contact Info */}
                             <div className="space-y-2">
-                                <h1 className="text-3xl font-bold text-[#3D4A67]">
+                                <h1 className="text-2xl sm:text-3xl font-bold text-[#3D4A67]">
                                     {contact.isCompany ? contact.companyName : `${contact.firstName} ${contact.lastName}`}
                                 </h1>
 
                                 {/* Status Selector */}
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-3">
                                     <Select
                                         value={contact.status}
                                         onValueChange={(v) => updateStatus(contactId, v as ContactStatus)}
@@ -201,18 +223,19 @@ export default function ContactDetailPage() {
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="flex gap-2">
-                            <div className="relative">
+                        <div className="flex flex-wrap gap-2 sm:shrink-0">
+                            {/* Export menu with proper click-outside handling */}
+                            <div className="relative" ref={exportMenuRef}>
                                 <Button
                                     variant="outline"
-                                    onClick={() => setShowExportMenu(!showExportMenu)}
+                                    onClick={() => setShowExportMenu(prev => !prev)}
                                     className="border-slate-300"
                                 >
                                     <Download className="h-4 w-4 mr-2" />
                                     Export Data
                                 </Button>
                                 {showExportMenu && (
-                                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-slate-200 z-10">
+                                    <div className="absolute right-0 mt-2 w-40 bg-white rounded-lg shadow-lg border border-slate-200 z-20">
                                         <button
                                             onClick={() => handleExport('json')}
                                             className="w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 rounded-t-lg"
@@ -333,8 +356,9 @@ export default function ContactDetailPage() {
                                         </label>
                                         <p className="text-xs text-red-700 mt-1">
                                             Permanently delete ALL data related to this contact including invoices,
-                                            tasks, projects, and activity history. This action <strong>cannot be
-                                                undone</strong>. A deletion certificate will be generated for compliance.
+                                            tasks, projects, and activity history. This action{' '}
+                                            <strong>cannot be undone</strong>. A deletion certificate will be
+                                            generated for compliance.
                                         </p>
                                     </div>
                                 </div>
@@ -342,8 +366,7 @@ export default function ContactDetailPage() {
 
                             {!gdprDelete && (
                                 <p className="text-xs text-slate-500">
-                                    Regular deletion will remove the contact but may retain some data for business
-                                    records.
+                                    Regular deletion archives the contact and preserves business records.
                                 </p>
                             )}
                         </AlertDialogDescription>
@@ -361,9 +384,7 @@ export default function ContactDetailPage() {
                                     Deleting...
                                 </>
                             ) : (
-                                <>
-                                    {gdprDelete ? 'Permanently Delete (GDPR)' : 'Delete'}
-                                </>
+                                gdprDelete ? 'Permanently Delete (GDPR)' : 'Delete'
                             )}
                         </AlertDialogAction>
                     </AlertDialogFooter>

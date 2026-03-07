@@ -2,20 +2,22 @@
 
 import { useState } from 'react'
 import { DndContext, DragEndEvent, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, DragStartEvent } from '@dnd-kit/core'
-import { Contact, ContactStatus } from '@/types/contact'
+import { ContactStatus } from '@/types/contact'
 import { KanbanColumn } from './kanban-column'
 import { KanbanCard } from './kanban-card'
 import { useContactStore } from '@/stores/contact-store'
+import { Loader2 } from 'lucide-react'
 
 interface KanbanBoardProps {
-    contacts: Contact[]
     onDeleteContact: (id: string) => void
 }
 
 const COLUMNS: ContactStatus[] = ['lead', 'opportunity', 'client', 'churned']
 
-export function KanbanBoard({ contacts, onDeleteContact }: KanbanBoardProps) {
+export function KanbanBoard({ onDeleteContact }: KanbanBoardProps) {
     const updateStatus = useContactStore(state => state.updateStatus)
+    const allContacts = useContactStore(state => state.allContacts)
+    const isLoadingKanban = useContactStore(state => state.isLoadingKanban)
     const [activeId, setActiveId] = useState<string | null>(null)
 
     const sensors = useSensors(
@@ -41,12 +43,9 @@ export function KanbanBoard({ contacts, onDeleteContact }: KanbanBoardProps) {
 
         if (over && active.id !== over.id) {
             // Find the dragged contact
-            const contact = contacts.find((c) => c.id === active.id)
+            const contact = allContacts.find((c) => c.id === active.id)
 
-            // Determine the new status
-            // If dropped on a column, over.id is the status string
-            // If dropped on a card, verify implementation (usually simpler to just drop on column in basic version)
-            // For this implementation, we simplified KanbanColumn to be the droppable area with id=status
+            // Determine the new status — over.id is the column status string
             const newStatus = over.id as ContactStatus
 
             if (contact && contact.status !== newStatus && COLUMNS.includes(newStatus)) {
@@ -57,7 +56,16 @@ export function KanbanBoard({ contacts, onDeleteContact }: KanbanBoardProps) {
         setActiveId(null)
     }
 
-    const activeContact = activeId ? contacts.find(c => c.id === activeId) : null
+    const activeContact = activeId ? allContacts.find(c => c.id === activeId) : null
+
+    if (isLoadingKanban) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
+                <span className="ml-2 text-slate-500">Loading board...</span>
+            </div>
+        )
+    }
 
     return (
         <DndContext
@@ -70,7 +78,7 @@ export function KanbanBoard({ contacts, onDeleteContact }: KanbanBoardProps) {
                     <KanbanColumn
                         key={colId}
                         id={colId}
-                        contacts={contacts}
+                        contacts={allContacts}
                         onDeleteContact={onDeleteContact}
                     />
                 ))}
