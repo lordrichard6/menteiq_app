@@ -43,6 +43,14 @@ max_frequency = "1s"
 otp_length = 6
 otp_expiry = 3600
 
+[auth.rate_limit]
+# Per hour, per project
+email_sent = 100
+# Per 5 minutes, per IP
+sign_in_sign_ups = 100
+token_refresh = 300
+token_verifications = 100
+
 [auth.hook.send_email]
 enabled = true
 uri = "https://app.menteiq.ch/api/auth/send-email"
