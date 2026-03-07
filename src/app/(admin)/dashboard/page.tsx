@@ -89,16 +89,13 @@ interface OverdueItem {
 function StatCardSkeleton() {
     return (
         <div
-            className="rounded-xl border-l-4 border-l-slate-200 border-y border-r border-slate-200 bg-white p-5 shadow-sm animate-pulse"
+            className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 shadow-sm animate-pulse"
             role="status" aria-label="Loading metric"
         >
-            <div className="flex items-start justify-between">
-                <div className="space-y-2 flex-1">
-                    <div className="h-3.5 w-28 rounded bg-slate-200" />
-                    <div className="h-8 w-16 rounded bg-slate-200" />
-                    <div className="h-3 w-24 rounded bg-slate-200" />
-                </div>
-                <div className="h-10 w-10 rounded-lg bg-slate-200 shrink-0" />
+            <div className="space-y-2">
+                <div className="h-3.5 w-28 rounded bg-slate-200" />
+                <div className="h-8 w-16 rounded bg-slate-200" />
+                <div className="h-3 w-24 rounded bg-slate-200" />
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100">
                 <div className="h-3 w-32 rounded bg-slate-100" />
@@ -112,53 +109,44 @@ interface StatCardProps {
     label: string
     value: string | number
     icon: React.ElementType
-    iconBg: string
     iconColor: string
-    accentBorder: string
     trend?: string
     trendUp?: boolean
     note?: string
     noteIcon?: React.ElementType
 }
 
-function StatCard({ href, label, value, icon: Icon, iconBg, iconColor, accentBorder, trend, trendUp, note, noteIcon: NoteIcon }: StatCardProps) {
+function StatCard({ href, label, value, icon: Icon, iconColor, trend, trendUp, note, noteIcon: NoteIcon }: StatCardProps) {
     return (
         <Link href={href} aria-label={`${label}: ${String(value)}`} className="block h-full">
-            <Card className={cn(
-                "border-l-4 border-y border-r border-slate-200 bg-white shadow-sm h-full",
-                "hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer",
-                accentBorder,
-            )}>
-                <CardContent className="p-4 sm:p-5 flex flex-col h-full">
-                    <div className="flex items-start justify-between">
-                        <div className="min-w-0 flex-1 pr-2">
-                            <p className="text-xs sm:text-sm font-medium text-slate-500 truncate">{label}</p>
-                            <p className="text-2xl sm:text-3xl font-bold text-[#3D4A67] leading-tight mt-0.5">{value}</p>
-                            {trend && (
-                                <div className="flex items-center gap-1 mt-1">
-                                    {trendUp !== undefined && (
-                                        <TrendingUp
-                                            className={cn("h-3 w-3 shrink-0", trendUp ? 'text-green-500' : 'text-slate-400 rotate-180')}
-                                            aria-hidden="true"
-                                        />
-                                    )}
-                                    <span className={cn(
-                                        "text-xs font-medium",
-                                        trendUp === true  ? 'text-green-600'
-                                        : trendUp === false ? 'text-red-500'
-                                        : 'text-slate-400'
-                                    )}>
-                                        {trend}
-                                    </span>
-                                </div>
+            <Card className="relative overflow-hidden border border-slate-200 bg-white shadow-sm h-full hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+                {/* Ghost watermark */}
+                <div className="absolute -top-4 -right-4 pointer-events-none select-none" aria-hidden="true">
+                    <Icon className={cn("h-28 w-28 opacity-[0.055]", iconColor)} />
+                </div>
+                <CardContent className="relative p-4 sm:p-5 flex flex-col h-full">
+                    <p className="text-xs sm:text-sm font-medium text-slate-500 truncate">{label}</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-[#3D4A67] leading-tight mt-1">{value}</p>
+                    {trend && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                            {trendUp !== undefined && (
+                                <TrendingUp
+                                    className={cn("h-3 w-3 shrink-0", trendUp ? 'text-green-500' : 'text-slate-400 rotate-180')}
+                                    aria-hidden="true"
+                                />
                             )}
+                            <span className={cn(
+                                "text-xs font-medium",
+                                trendUp === true  ? 'text-green-600'
+                                : trendUp === false ? 'text-red-500'
+                                : 'text-slate-400'
+                            )}>
+                                {trend}
+                            </span>
                         </div>
-                        <div className={cn("flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg shrink-0", iconBg)}>
-                            <Icon className={cn("h-4 w-4 sm:h-5 sm:w-5", iconColor)} aria-hidden="true" />
-                        </div>
-                    </div>
+                    )}
                     {note && (
-                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5">
+                        <div className="mt-auto pt-3 flex items-center gap-1.5">
                             {NoteIcon && <NoteIcon className="h-3.5 w-3.5 text-slate-400 shrink-0" aria-hidden="true" />}
                             <p className="text-xs text-slate-500 truncate">{note}</p>
                         </div>
@@ -620,9 +608,7 @@ export default function DashboardPage() {
                             label="Total Contacts"
                             value={contacts.length}
                             icon={Users}
-                            iconBg="bg-[#3D4A67]/10"
                             iconColor="text-[#3D4A67]"
-                            accentBorder="border-l-[#3D4A67]"
                             trend={contactsThisMonth > 0 ? `+${contactsThisMonth} this month` : 'No new this month'}
                             trendUp={contactsThisMonth > 0 ? true : undefined}
                             note={newClientsThisMonth > 0 ? `${newClientsThisMonth} new client${newClientsThisMonth > 1 ? 's' : ''} this month` : `${pipeline.client} active clients`}
@@ -633,9 +619,7 @@ export default function DashboardPage() {
                             label="Active Projects"
                             value={activeProjects}
                             icon={FolderKanban}
-                            iconBg="bg-[#9EAE8E]/20"
                             iconColor="text-[#9EAE8E]"
-                            accentBorder="border-l-[#9EAE8E]"
                             trend={projectsThisMonth > 0 ? `+${projectsThisMonth} this month` : undefined}
                             trendUp={projectsThisMonth > 0 ? true : undefined}
                             note={`${completedProjects} completed overall`}
@@ -646,9 +630,7 @@ export default function DashboardPage() {
                             label="Open Tasks"
                             value={openTasks}
                             icon={CheckSquare}
-                            iconBg="bg-amber-100"
-                            iconColor="text-amber-600"
-                            accentBorder="border-l-[#E9B949]"
+                            iconColor="text-amber-500"
                             trend={completionRate > 0 ? `${completionRate}% completion rate` : undefined}
                             trendUp={completionRate >= 50 ? true : completionRate > 0 ? undefined : false}
                             note={totalTasks > 0 ? `${doneTasks} done of ${totalTasks} total` : 'No tasks yet'}
@@ -656,27 +638,24 @@ export default function DashboardPage() {
                         />
                         {/* Revenue card — custom to show pending info */}
                         <Link href="/invoices" aria-label={`Revenue: ${formatCHF(revenue)}`} className="block h-full">
-                            <Card className="border-l-4 border-l-[#D1855C] border-y border-r border-slate-200 bg-white shadow-sm h-full hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
-                                <CardContent className="p-4 sm:p-5 flex flex-col h-full">
-                                    <div className="flex items-start justify-between">
-                                        <div className="min-w-0 flex-1 pr-2">
-                                            <p className="text-xs sm:text-sm font-medium text-slate-500">Revenue (Paid)</p>
-                                            <p className="text-xl sm:text-2xl font-bold text-[#3D4A67] leading-tight mt-0.5">{formatCHF(revenue)}</p>
-                                            {revenueThisMonth > 0 && (
-                                                <div className="flex items-center gap-1 mt-1">
-                                                    <TrendingUp className="h-3 w-3 text-green-500 shrink-0" aria-hidden="true" />
-                                                    <span className="text-xs font-medium text-green-600">
-                                                        +{formatCHF(revenueThisMonth)} this month
-                                                    </span>
-                                                </div>
-                                            )}
+                            <Card className="relative overflow-hidden border border-slate-200 bg-white shadow-sm h-full hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer">
+                                {/* Ghost watermark */}
+                                <div className="absolute -top-4 -right-4 pointer-events-none select-none" aria-hidden="true">
+                                    <Receipt className="h-28 w-28 text-[#D1855C] opacity-[0.055]" />
+                                </div>
+                                <CardContent className="relative p-4 sm:p-5 flex flex-col h-full">
+                                    <p className="text-xs sm:text-sm font-medium text-slate-500">Revenue (Paid)</p>
+                                    <p className="text-2xl sm:text-3xl font-bold text-[#3D4A67] leading-tight mt-1">{formatCHF(revenue)}</p>
+                                    {revenueThisMonth > 0 && (
+                                        <div className="flex items-center gap-1 mt-1.5">
+                                            <TrendingUp className="h-3 w-3 text-green-500 shrink-0" aria-hidden="true" />
+                                            <span className="text-xs font-medium text-green-600">
+                                                +{formatCHF(revenueThisMonth)} this month
+                                            </span>
                                         </div>
-                                        <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-[#D1855C]/15 shrink-0">
-                                            <Receipt className="h-4 w-4 sm:h-5 sm:w-5 text-[#D1855C]" aria-hidden="true" />
-                                        </div>
-                                    </div>
+                                    )}
                                     {pendingInvoices.length > 0 && (
-                                        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-1.5">
+                                        <div className="mt-auto pt-3 flex items-center gap-1.5">
                                             <CreditCard className="h-3.5 w-3.5 text-amber-500 shrink-0" aria-hidden="true" />
                                             <p className="text-xs text-slate-500 truncate">
                                                 {pendingInvoices.length} awaiting ({formatCHF(pendingAmount)})
