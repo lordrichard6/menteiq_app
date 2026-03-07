@@ -9,46 +9,68 @@
 import { SwissInvoiceService } from '@/lib/swiss/qr-invoice'
 import { EUInvoiceService } from '@/lib/invoices/eu-invoice'
 import type { InvoiceWithLineItems } from '@/lib/services/invoice-service'
+import { getBillingSettings } from '@/lib/types/billing-settings'
+
+export class PDFGenerationError extends Error {
+    constructor(message: string) {
+        super(message)
+        this.name = 'PDFGenerationError'
+    }
+}
 
 export async function generateInvoicePDF(
     invoice: InvoiceWithLineItems,
     settings: Record<string, unknown>
 ): Promise<Buffer> {
-    const billing = (settings.billing as Record<string, unknown>) || {}
+    // Validate invoice has a contact
+    if (!invoice.contact) {
+        throw new PDFGenerationError('Invoice has no associated contact. Cannot generate PDF.')
+    }
 
-    // Creditor info from org settings
-    const creditorName    = (billing.company_name  as string | undefined) || 'My Company'
-    const creditorAddress = (billing.address_line1 as string | undefined) || 'My Address'
-    const creditorZip     = (billing.postal_code   as string | undefined) || '1000'
-    const creditorCity    = (billing.city          as string | undefined) || 'Zurich'
-    const creditorCountry = (billing.country       as string | undefined) || 'CH'
-    const creditorAccount = ((billing.iban          as string | undefined) || '').replace(/\s/g, '')
-    const creditorVat     = billing.vat_number as string | undefined
-    const creditorEmail   = billing.email      as string | undefined
-    const creditorPhone   = billing.phone      as string | undefined
-    const creditorBic     = billing.bic        as string | undefined
-    const creditorBank    = billing.bank_name  as string | undefined
+    const billing = getBillingSettings(settings)
 
-    // Debtor info from contact (full address fields fetched by download routes)
+    // Creditor info from org settings — fall back to safe placeholders
+    const creditorName    = billing.company_name  ?? 'My Company'
+    const creditorAddress = billing.address_line1 ?? 'My Address'
+    const creditorZip     = billing.postal_code   ?? '1000'
+    const creditorCity    = billing.city          ?? 'Zurich'
+    const creditorCountry = billing.country       ?? 'CH'
+    const creditorAccount = (billing.iban ?? '').replace(/\s/g, '')
+    const creditorVat     = billing.vat_number
+    const creditorEmail   = billing.email
+    const creditorPhone   = billing.phone
+    const creditorBic     = billing.bic
+    const creditorBank    = billing.bank_name
+
+    // Debtor info from contact — validate required address fields
     const contact    = invoice.contact
-    const clientName = contact?.is_company
-        ? contact.company_name || 'Valued Client'
-        : `${contact?.first_name || ''} ${contact?.last_name || ''}`.trim() || 'Valued Client'
+    const clientName = contact.is_company
+        ? (contact.company_name ?? 'Valued Client')
+        : `${contact.first_name ?? ''} ${contact.last_name ?? ''}`.trim() || 'Valued Client'
+
+    // Warn if address is incomplete (degrade gracefully with placeholders)
+    const hasAddress = Boolean(contact.address_line1 && contact.city && contact.postal_code)
+    if (!hasAddress) {
+        throw new PDFGenerationError(
+            `Contact "${clientName}" is missing required address fields (address, city, postal code). ` +
+            'Please update the contact before generating a PDF.'
+        )
+    }
 
     const debtor = {
         name:    clientName,
-        address: contact?.address_line1 || 'Unknown Address',
-        zip:     contact?.postal_code   || '0000',
-        city:    contact?.city          || 'Unknown City',
-        country: contact?.country       || 'CH',
+        address: contact.address_line1 ?? 'Unknown Address',
+        zip:     contact.postal_code   ?? '0000',
+        city:    contact.city          ?? 'Unknown City',
+        country: contact.country       ?? 'CH',
     }
 
     // Route to correct service
     if (invoice.invoice_type === 'swiss_qr') {
         return SwissInvoiceService.generatePDF({
             invoice_number: invoice.invoice_number,
-            invoice_date:   invoice.invoice_date || new Date().toISOString().split('T')[0],
-            due_date:       invoice.due_date     || new Date().toISOString().split('T')[0],
+            invoice_date:   invoice.invoice_date ?? new Date().toISOString().split('T')[0],
+            due_date:       invoice.due_date     ?? new Date().toISOString().split('T')[0],
             amount:         invoice.amount_total,
             currency:       invoice.currency as 'CHF' | 'EUR',
             creditor: {
@@ -63,7 +85,7 @@ export async function generateInvoicePDF(
                 phone:      creditorPhone,
             },
             debtor,
-            reference:  invoice.qr_reference || '',
+            reference:  invoice.qr_reference ?? '',
             line_items: invoice.line_items,
             subtotal:   invoice.subtotal  ?? undefined,
             tax_total:  invoice.tax_total ?? undefined,
@@ -74,8 +96,8 @@ export async function generateInvoicePDF(
     // EU SEPA
     return EUInvoiceService.generatePDF({
         invoice_number: invoice.invoice_number,
-        invoice_date:   invoice.invoice_date || new Date().toISOString().split('T')[0],
-        due_date:       invoice.due_date     || new Date().toISOString().split('T')[0],
+        invoice_date:   invoice.invoice_date ?? new Date().toISOString().split('T')[0],
+        due_date:       invoice.due_date     ?? new Date().toISOString().split('T')[0],
         currency:       invoice.currency,
         creditor: {
             company_name: creditorName,

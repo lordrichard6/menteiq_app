@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useInvoiceStore } from '@/stores/invoice-store'
 import { Plus, FileText, Calendar } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 
@@ -101,8 +102,13 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                     </div>
                 ) : (
                     Object.entries(revenueByCurrency).map(([currency, amount]) => (
-                        <div key={currency} className="text-2xl font-bold text-[#3D4A67]">
-                            {formatMoney(amount, currency)}
+                        <div key={currency} className="flex flex-col">
+                            <div className="text-2xl font-bold text-[#3D4A67]">
+                                {formatMoney(amount, currency)}
+                            </div>
+                            {Object.keys(revenueByCurrency).length > 1 && (
+                                <span className="text-xs text-slate-400 uppercase tracking-wide">{currency} revenue</span>
+                            )}
                         </div>
                     ))
                 )}
@@ -112,18 +118,13 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
             {contactInvoices.length > 0 ? (
                 <div className="space-y-3">
                     {contactInvoices.map((invoice) => (
-                        <Card
+                        <Link
                             key={invoice.id}
-                            role="link"
-                            tabIndex={0}
+                            href={`/invoices/${invoice.id}`}
+                            className="block"
+                        >
+                        <Card
                             className="border-slate-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
-                            onClick={() => router.push(`/invoices/${invoice.id}`)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault()
-                                    router.push(`/invoices/${invoice.id}`)
-                                }
-                            }}
                         >
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
@@ -157,6 +158,7 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                                 </div>
                             </CardContent>
                         </Card>
+                        </Link>
                     ))}
                 </div>
             ) : (

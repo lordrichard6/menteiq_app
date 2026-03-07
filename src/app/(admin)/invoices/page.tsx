@@ -167,31 +167,43 @@ export default function InvoicesPage() {
             await navigator.clipboard.writeText(link)
             toast.success('Payment link copied to clipboard')
         } else {
-            toast.error('Failed to create payment link')
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to create payment link')
         }
     }
 
     const handleMarkAsSent = async (invoiceId: string) => {
         setActionLoading(invoiceId)
-        await markAsSent(invoiceId)
+        const success = await markAsSent(invoiceId)
         setActionLoading(null)
-        toast.success('Invoice marked as sent')
+        if (success) {
+            toast.success('Invoice marked as sent')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to mark as sent')
+        }
     }
 
     const handleMarkAsPaid = async (invoiceId: string) => {
         setActionLoading(invoiceId)
-        await markAsPaid(invoiceId)
+        const success = await markAsPaid(invoiceId)
         setActionLoading(null)
-        toast.success('Invoice marked as paid')
+        if (success) {
+            toast.success('Invoice marked as paid')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to mark as paid')
+        }
     }
 
     const handleDelete = async () => {
         if (!deleteId) return
         setActionLoading(deleteId)
-        await deleteInvoice(deleteId)
+        const success = await deleteInvoice(deleteId)
         setActionLoading(null)
         setDeleteId(null)
-        toast.success('Invoice deleted')
+        if (success) {
+            toast.success('Invoice deleted')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to delete invoice')
+        }
     }
 
     return (
@@ -230,12 +242,17 @@ export default function InvoicesPage() {
                             <div className="text-2xl font-bold text-[#3D4A67]">CHF 0.00</div>
                         ) : (
                             Object.entries(revenueByCurrency).map(([currency, amount]) => (
-                                <div key={currency} className="text-xl font-bold text-[#3D4A67]">
-                                    {formatMoney(amount, currency)}
+                                <div key={currency} className="flex flex-col">
+                                    <div className="text-xl font-bold text-[#3D4A67]">
+                                        {formatMoney(amount, currency)}
+                                    </div>
+                                    {Object.keys(revenueByCurrency).length > 1 && (
+                                        <span className="text-xs text-slate-400 uppercase tracking-wide">{currency} revenue</span>
+                                    )}
                                 </div>
                             ))
                         )}
-                        <p className="text-sm text-slate-500">Revenue</p>
+                        <p className="text-sm text-slate-500 mt-1">Revenue</p>
                     </CardContent>
                 </Card>
             </div>
@@ -252,7 +269,7 @@ export default function InvoicesPage() {
                     />
                 </div>
                 <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setCurrentPage(1) }}>
-                    <SelectTrigger className="w-40 border-slate-300">
+                    <SelectTrigger className="w-40 border-slate-300" aria-label="Filter by status">
                         <Filter className="h-4 w-4 mr-2" />
                         <SelectValue placeholder="Filter" />
                     </SelectTrigger>
@@ -343,6 +360,7 @@ export default function InvoicesPage() {
                                                             variant="ghost"
                                                             size="sm"
                                                             disabled={actionLoading === invoice.id}
+                                                            aria-label={`Actions for invoice ${invoice.invoice_number}`}
                                                         >
                                                             {actionLoading === invoice.id ? (
                                                                 <Loader2 className="h-4 w-4 animate-spin" />

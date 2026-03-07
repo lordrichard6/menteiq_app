@@ -136,16 +136,24 @@ export default function InvoiceDetailPage() {
 
     const handleMarkAsSent = async () => {
         setActionLoading(true)
-        await markAsSent(invoice.id)
+        const success = await markAsSent(invoice.id)
         setActionLoading(false)
-        toast.success('Invoice marked as sent')
+        if (success) {
+            toast.success('Invoice marked as sent')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to mark as sent')
+        }
     }
 
     const handleMarkAsPaid = async () => {
         setActionLoading(true)
-        await markAsPaid(invoice.id)
+        const success = await markAsPaid(invoice.id)
         setActionLoading(false)
-        toast.success('Invoice marked as paid')
+        if (success) {
+            toast.success('Invoice marked as paid')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to mark as paid')
+        }
     }
 
     const handleCreatePaymentLink = async () => {
@@ -156,17 +164,21 @@ export default function InvoiceDetailPage() {
             await navigator.clipboard.writeText(link)
             toast.success('Payment link created and copied to clipboard')
         } else {
-            toast.error('Failed to create payment link')
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to create payment link')
         }
     }
 
     const handleDelete = async () => {
         setActionLoading(true)
-        await deleteInvoice(invoice.id)
+        const success = await deleteInvoice(invoice.id)
         setActionLoading(false)
-        setShowDeleteDialog(false)
-        toast.success('Invoice deleted')
-        router.push('/invoices')
+        if (success) {
+            setShowDeleteDialog(false)
+            toast.success('Invoice deleted')
+            router.push('/invoices')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to delete invoice')
+        }
     }
 
     const handleDownloadPDF = () => {
@@ -419,12 +431,17 @@ export default function InvoiceDetailPage() {
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogCancel disabled={actionLoading}>Cancel</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={handleDelete}
+                            disabled={actionLoading}
                             className="bg-red-600 hover:bg-red-700 text-white"
                         >
-                            Delete
+                            {actionLoading ? (
+                                <><Loader2 className="h-4 w-4 animate-spin mr-2 inline" />Deleting...</>
+                            ) : (
+                                'Delete'
+                            )}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

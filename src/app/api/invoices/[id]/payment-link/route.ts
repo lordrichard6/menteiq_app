@@ -74,10 +74,10 @@ export async function POST(
       cached: false,
     });
 
-  } catch (error: any) {
-    console.error('Payment link creation error:', error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to create payment link'
     return NextResponse.json(
-      { error: error.message || 'Failed to create payment link' },
+      { error: message },
       { status: 500 }
     );
   }
@@ -117,10 +117,10 @@ export async function GET(
       status: invoice.status,
     });
 
-  } catch (error: any) {
-    console.error('Get payment link error:', error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to get payment link'
     return NextResponse.json(
-      { error: error.message || 'Failed to get payment link' },
+      { error: message },
       { status: 500 }
     );
   }

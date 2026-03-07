@@ -115,7 +115,7 @@ export const SwissInvoiceService = {
         reference: data.reference.replace(/\s/g, ''), // Remove spaces
       };
 
-      const pdf = new SwissQRBill(qrBillData) as any;
+      const pdf = new SwissQRBill(qrBillData);
 
       const stream = new PassThrough();
       const chunks: Buffer[] = [];
@@ -148,7 +148,7 @@ export const SwissInvoiceService = {
 // RENDER FUNCTIONS
 // =====================================================
 
-function renderDetailedInvoice(pdf: any, data: SwissInvoiceData): void {
+function renderDetailedInvoice(pdf: SwissQRBill, data: SwissInvoiceData): void {
   const pageWidth = 495; // A4 width minus margins
   
   // ===== CREDITOR HEADER =====
@@ -318,7 +318,7 @@ function renderDetailedInvoice(pdf: any, data: SwissInvoiceData): void {
     );
 }
 
-function renderSimpleInvoice(pdf: any, data: LegacyInvoiceData): void {
+function renderSimpleInvoice(pdf: SwissQRBill, data: LegacyInvoiceData): void {
   // Legacy simple format
   pdf.fontSize(20).text('Invoice', 50, 50);
   pdf.fontSize(12).text(`Reference: ${data.reference}`, 50, 80);

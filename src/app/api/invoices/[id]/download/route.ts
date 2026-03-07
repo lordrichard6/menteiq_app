@@ -48,14 +48,17 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     try {
         const pdfBuffer = await generateInvoicePDF(fullInvoice, settings)
 
+        // Sanitize filename — remove characters not safe in Content-Disposition
+        const safeFilename = invoice.invoice_number.replace(/[^a-zA-Z0-9\-_.]/g, '_')
+
         return new Response(pdfBuffer as unknown as BodyInit, {
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${invoice.invoice_number}.pdf"`,
+                'Content-Disposition': `attachment; filename="${safeFilename}.pdf"`,
             },
         })
-    } catch (err) {
-        console.error('PDF Generation Error:', err)
-        return new Response('Failed to generate PDF', { status: 500 })
+    } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to generate PDF'
+        return new Response(message, { status: 500 })
     }
 }
