@@ -9,6 +9,7 @@ import { useTaskStore } from '@/stores/task-store'
 import { Plus, CheckSquare, Calendar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 
 interface ContactTasksTabProps {
     contact: Contact
@@ -40,51 +41,35 @@ export function ContactTasksTab({ contact }: ContactTasksTabProps) {
 
     const handleToggleComplete = async (taskId: string, currentStatus: string) => {
         const newStatus = currentStatus === 'done' ? 'todo' : 'done'
-        await updateTask(taskId, { status: newStatus })
+        try {
+            await updateTask(taskId, { status: newStatus })
+        } catch (error) {
+            console.error('Failed to update task:', error)
+            toast.error('Failed to update task status')
+        }
     }
 
     return (
         <div className="space-y-4">
             {/* Header with filters and action */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                    <Button
-                        variant={filter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                        className={filter === 'all' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        All
-                    </Button>
-                    <Button
-                        variant={filter === 'todo' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('todo')}
-                        className={filter === 'todo' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        To Do
-                    </Button>
-                    <Button
-                        variant={filter === 'in_progress' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('in_progress')}
-                        className={filter === 'in_progress' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        In Progress
-                    </Button>
-                    <Button
-                        variant={filter === 'done' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('done')}
-                        className={filter === 'done' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Done
-                    </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                    {(['all', 'todo', 'in_progress', 'done'] as const).map((f) => (
+                        <Button
+                            key={f}
+                            variant={filter === f ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFilter(f)}
+                            className={filter === f ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
+                        >
+                            {f === 'all' ? 'All' : STATUS_LABELS[f]}
+                        </Button>
+                    ))}
                 </div>
 
                 <Button
                     onClick={() => router.push(`/tasks/new?contact=${contact.id}`)}
-                    className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white"
+                    className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white shrink-0"
                 >
                     <Plus className="h-4 w-4 mr-2" />
                     New Task
@@ -108,7 +93,15 @@ export function ContactTasksTab({ contact }: ContactTasksTabProps) {
                                     />
                                     <div
                                         className="flex-1 cursor-pointer"
+                                        role="link"
+                                        tabIndex={0}
                                         onClick={() => router.push(`/tasks/${task.id}`)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault()
+                                                router.push(`/tasks/${task.id}`)
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-center gap-2">
                                             <div className={`font-medium ${task.status === 'done' ? 'line-through text-slate-400' : 'text-[#3D4A67]'}`}>

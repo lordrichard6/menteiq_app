@@ -1,9 +1,12 @@
 'use client'
 
 import { useContactStore } from '@/stores/contact-store'
+import { useInvoiceStore } from '@/stores/invoice-store'
+import { useProjectStore } from '@/stores/project-store'
+import { useTaskStore } from '@/stores/task-store'
 import { Contact, ContactStatus, STATUS_LABELS, STATUS_COLORS } from '@/types/contact'
 import { useParams, useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -42,6 +45,10 @@ export default function ContactDetailPage() {
     const deleteContact = useContactStore((state) => state.deleteContact)
     const fetchContactById = useContactStore((state) => state.fetchContactById)
     const isLoadingStore = useContactStore((state) => state.isLoading)
+
+    const invoices = useInvoiceStore((state) => state.invoices)
+    const projects = useProjectStore((state) => state.projects)
+    const tasks = useTaskStore((state) => state.tasks)
 
     const [contact, setContact] = useState<Contact | null>(null)
     const [isInternalLoading, setIsInternalLoading] = useState(false)
@@ -92,6 +99,16 @@ export default function ContactDetailPage() {
     }, [contactId, contacts, fetchContactById])
 
     const isLoading = isLoadingStore || isInternalLoading
+
+    const tabCounts = useMemo(() => {
+        if (!contact) return { invoices: 0, projects: 0, tasks: 0, notes: 0 }
+        return {
+            invoices: invoices.filter(inv => inv.contact_id === contact.id).length,
+            projects: projects.filter(proj => proj.clientId === contact.id).length,
+            tasks: tasks.filter(task => task.contactId === contact.id).length,
+            notes: (contact.notes ?? []).length,
+        }
+    }, [invoices, projects, tasks, contact])
 
     const handleDelete = async () => {
         setIsDeleting(true)
@@ -317,10 +334,18 @@ export default function ContactDetailPage() {
             <Tabs defaultValue="overview" className="w-full">
                 <TabsList className="grid w-full grid-cols-5 bg-slate-100">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="invoices">Invoices</TabsTrigger>
-                    <TabsTrigger value="projects">Projects</TabsTrigger>
-                    <TabsTrigger value="tasks">Tasks</TabsTrigger>
-                    <TabsTrigger value="notes">Notes</TabsTrigger>
+                    <TabsTrigger value="invoices">
+                        Invoices{tabCounts.invoices > 0 ? ` (${tabCounts.invoices})` : ''}
+                    </TabsTrigger>
+                    <TabsTrigger value="projects">
+                        Projects{tabCounts.projects > 0 ? ` (${tabCounts.projects})` : ''}
+                    </TabsTrigger>
+                    <TabsTrigger value="tasks">
+                        Tasks{tabCounts.tasks > 0 ? ` (${tabCounts.tasks})` : ''}
+                    </TabsTrigger>
+                    <TabsTrigger value="notes">
+                        Notes{tabCounts.notes > 0 ? ` (${tabCounts.notes})` : ''}
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-6">

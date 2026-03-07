@@ -9,7 +9,7 @@ import { useTaskStore } from '@/stores/task-store'
 import { PortalAccessSection } from './portal-access-section'
 import { ActivityTimeline } from './activity-timeline'
 import { ConsentManagement } from './consent-management'
-import { Mail, Phone, Building2, FileText, FolderKanban, CheckSquare, MapPin, Loader2 } from 'lucide-react'
+import { Mail, Phone, Building2, FileText, FolderKanban, CheckSquare, MapPin, Loader2, Calendar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo } from 'react'
 
@@ -186,6 +186,12 @@ export function ContactOverviewTab({ contact }: ContactOverviewTabProps) {
                                 </div>
                             </div>
                         )}
+                        <div className="flex items-center gap-3">
+                            <Calendar className="h-4 w-4 text-slate-500 shrink-0" />
+                            <span className="text-sm text-slate-700">
+                                Contact since {new Date(contact.createdAt).toLocaleDateString('de-CH')}
+                            </span>
+                        </div>
                     </div>
                 </CardContent>
             </Card>

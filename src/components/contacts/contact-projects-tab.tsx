@@ -43,45 +43,24 @@ export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
     return (
         <div className="space-y-4">
             {/* Header with filters and action */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                    <Button
-                        variant={filter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                        className={filter === 'all' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        All
-                    </Button>
-                    <Button
-                        variant={filter === 'lead' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('lead')}
-                        className={filter === 'lead' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Lead
-                    </Button>
-                    <Button
-                        variant={filter === 'active' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('active')}
-                        className={filter === 'active' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Active
-                    </Button>
-                    <Button
-                        variant={filter === 'completed' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('completed')}
-                        className={filter === 'completed' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Completed
-                    </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                    {(['all', 'lead', 'active', 'completed', 'on_hold'] as const).map((f) => (
+                        <Button
+                            key={f}
+                            variant={filter === f ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFilter(f)}
+                            className={filter === f ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
+                        >
+                            {f === 'all' ? 'All' : STATUS_LABELS[f]}
+                        </Button>
+                    ))}
                 </div>
 
                 <Button
                     onClick={() => router.push(`/projects/new?contact=${contact.id}`)}
-                    className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white"
+                    className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white shrink-0"
                 >
                     <Plus className="h-4 w-4 mr-2" />
                     New Project
@@ -94,8 +73,16 @@ export function ContactProjectsTab({ contact }: ContactProjectsTabProps) {
                     {contactProjects.map((project) => (
                         <Card
                             key={project.id}
+                            role="link"
+                            tabIndex={0}
                             className="border-slate-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
                             onClick={() => router.push(`/projects/${project.id}`)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    router.push(`/projects/${project.id}`)
+                                }
+                            }}
                         >
                             <CardContent className="p-4">
                                 <div className="flex items-start justify-between">

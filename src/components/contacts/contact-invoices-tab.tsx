@@ -13,7 +13,7 @@ interface ContactInvoicesTabProps {
     contact: Contact
 }
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
     draft: 'bg-slate-100 text-slate-700',
     sent: 'bg-blue-100 text-blue-700',
     paid: 'bg-green-100 text-green-700',
@@ -21,7 +21,7 @@ const STATUS_COLORS = {
     cancelled: 'bg-slate-100 text-slate-500',
 }
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<string, string> = {
     draft: 'Draft',
     sent: 'Sent',
     paid: 'Paid',
@@ -34,75 +34,55 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
     const invoices = useInvoiceStore((state) => state.invoices)
     const [filter, setFilter] = useState<'all' | 'draft' | 'sent' | 'paid' | 'overdue'>('all')
 
-    const contactInvoices = useMemo(() => {
-        const filtered = invoices.filter(inv => inv.contact_id === contact.id)
-        if (filter === 'all') return filtered
-        return filtered.filter(inv => inv.status === filter)
-    }, [invoices, contact.id, filter])
+    // All invoices for this contact — used for total revenue (always unfiltered)
+    const allContactInvoices = useMemo(
+        () => invoices.filter(inv => inv.contact_id === contact.id),
+        [invoices, contact.id]
+    )
 
-    const totalRevenue = useMemo(() => {
-        return contactInvoices
-            .filter(inv => inv.status === 'paid')
-            .reduce((sum, inv) => sum + inv.amount_total, 0)
-    }, [contactInvoices])
+    // Filtered list for display
+    const contactInvoices = useMemo(() => {
+        if (filter === 'all') return allContactInvoices
+        return allContactInvoices.filter(inv => inv.status === filter)
+    }, [allContactInvoices, filter])
+
+    // Total revenue always from ALL paid invoices, regardless of current filter
+    const totalRevenue = useMemo(
+        () =>
+            allContactInvoices
+                .filter(inv => inv.status === 'paid')
+                .reduce((sum, inv) => sum + inv.amount_total, 0),
+        [allContactInvoices]
+    )
 
     return (
         <div className="space-y-4">
             {/* Header with filters and action */}
-            <div className="flex items-center justify-between">
-                <div className="flex gap-2">
-                    <Button
-                        variant={filter === 'all' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('all')}
-                        className={filter === 'all' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        All
-                    </Button>
-                    <Button
-                        variant={filter === 'draft' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('draft')}
-                        className={filter === 'draft' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Draft
-                    </Button>
-                    <Button
-                        variant={filter === 'sent' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('sent')}
-                        className={filter === 'sent' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Sent
-                    </Button>
-                    <Button
-                        variant={filter === 'paid' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('paid')}
-                        className={filter === 'paid' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Paid
-                    </Button>
-                    <Button
-                        variant={filter === 'overdue' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilter('overdue')}
-                        className={filter === 'overdue' ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
-                    >
-                        Overdue
-                    </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                    {(['all', 'draft', 'sent', 'paid', 'overdue'] as const).map((f) => (
+                        <Button
+                            key={f}
+                            variant={filter === f ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFilter(f)}
+                            className={filter === f ? 'bg-[#3D4A67] hover:bg-[#2D3A57]' : ''}
+                        >
+                            {f === 'all' ? 'All' : STATUS_LABELS[f]}
+                        </Button>
+                    ))}
                 </div>
 
                 <Button
                     onClick={() => router.push(`/invoices/new?contact=${contact.id}`)}
-                    className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white"
+                    className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white shrink-0"
                 >
                     <Plus className="h-4 w-4 mr-2" />
                     New Invoice
                 </Button>
             </div>
 
-            {/* Total Revenue */}
+            {/* Total Revenue — always reflects all paid invoices regardless of filter */}
             <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
                 <div className="text-sm text-slate-600">Total Revenue (Paid)</div>
                 <div className="text-2xl font-bold text-[#3D4A67]">
@@ -116,8 +96,16 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                     {contactInvoices.map((invoice) => (
                         <Card
                             key={invoice.id}
+                            role="link"
+                            tabIndex={0}
                             className="border-slate-200 bg-white hover:shadow-md transition-shadow cursor-pointer"
                             onClick={() => router.push(`/invoices/${invoice.id}`)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault()
+                                    router.push(`/invoices/${invoice.id}`)
+                                }
+                            }}
                         >
                             <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
@@ -130,7 +118,9 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                                             <div className="text-sm text-slate-500 flex items-center gap-2 mt-1">
                                                 <Calendar className="h-3 w-3" />
                                                 {invoice.status === 'paid'
-                                                    ? `Paid: ${new Date(invoice.paid_at || '').toLocaleDateString('de-CH')}`
+                                                    ? invoice.paid_at
+                                                        ? `Paid: ${new Date(invoice.paid_at).toLocaleDateString('de-CH')}`
+                                                        : 'Paid'
                                                     : `Due: ${invoice.due_date ? new Date(invoice.due_date).toLocaleDateString('de-CH') : 'N/A'}`
                                                 }
                                             </div>
@@ -141,8 +131,8 @@ export function ContactInvoicesTab({ contact }: ContactInvoicesTabProps) {
                                             <div className="font-semibold text-[#3D4A67]">
                                                 CHF {invoice.amount_total.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
                                             </div>
-                                            <Badge className={STATUS_COLORS[invoice.status]}>
-                                                {STATUS_LABELS[invoice.status]}
+                                            <Badge className={STATUS_COLORS[invoice.status] ?? 'bg-slate-100 text-slate-700'}>
+                                                {STATUS_LABELS[invoice.status] ?? invoice.status}
                                             </Badge>
                                         </div>
                                     </div>

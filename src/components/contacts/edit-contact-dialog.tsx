@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useContactStore } from '@/stores/contact-store'
-import { Contact } from '@/types/contact'
+import { Contact, ContactStatus, STATUS_LABELS } from '@/types/contact'
 import {
     Dialog,
     DialogContent,
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2, AlertCircle } from 'lucide-react'
 import { isValidEmail, isValidPhone, formatPhone } from '@/lib/validation/contact'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 
 interface EditContactDialogProps {
@@ -38,6 +39,7 @@ function buildInitialForm(contact: Contact) {
         postalCode: contact.postalCode || '',
         city: contact.city || '',
         country: contact.country || '',
+        status: contact.status,
     }
 }
 
@@ -46,7 +48,8 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
     const [isLoading, setIsLoading] = useState(false)
     const [emailError, setEmailError] = useState<string | null>(null)
     const [phoneError, setPhoneError] = useState<string | null>(null)
-    const [isCheckingEmail, setIsCheckingEmail] = useState(false)
+    const [isCheckingEmailDuplicate, setIsCheckingEmailDuplicate] = useState(false)
+    const [isCheckingPhoneDuplicate, setIsCheckingPhoneDuplicate] = useState(false)
     const [formData, setFormData] = useState(() => buildInitialForm(contact))
 
     // Reset form to latest contact data whenever the dialog opens
@@ -65,9 +68,9 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
             return
         }
 
-        setIsCheckingEmail(true)
+        setIsCheckingEmailDuplicate(true)
         const duplicate = await checkDuplicate(email, undefined, contact.id)
-        setIsCheckingEmail(false)
+        setIsCheckingEmailDuplicate(false)
 
         if (duplicate) {
             setEmailError(`Contact already exists: ${duplicate.firstName} ${duplicate.lastName}`)
@@ -88,9 +91,9 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
             setFormData(prev => ({ ...prev, phone: formatted }))
             setPhoneError(null)
 
-            setIsCheckingEmail(true)
+            setIsCheckingPhoneDuplicate(true)
             const duplicate = await checkDuplicate(undefined, formatted, contact.id)
-            setIsCheckingEmail(false)
+            setIsCheckingPhoneDuplicate(false)
 
             if (duplicate) {
                 setPhoneError(`Phone already exists: ${duplicate.firstName} ${duplicate.lastName}`)
@@ -102,7 +105,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!formData.email || !isValidEmail(formData.email) || emailError || phoneError || isLoading) return
+        if (!formData.email || !isValidEmail(formData.email) || emailError || phoneError || isLoading || isCheckingEmailDuplicate || isCheckingPhoneDuplicate) return
 
         setIsLoading(true)
         try {
@@ -113,6 +116,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                 companyName: formData.companyName || undefined,
                 email: formData.email,
                 phone: formData.phone || undefined,
+                status: formData.status,
                 addressLine1: formData.addressLine1 || undefined,
                 addressLine2: formData.addressLine2 || undefined,
                 postalCode: formData.postalCode || undefined,
@@ -226,7 +230,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                             required
                             className={`border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 ${emailError ? "border-red-500" : ""}`}
                         />
-                        {isCheckingEmail && <p className="text-[10px] text-slate-500 animate-pulse">Checking for duplicates...</p>}
+                        {isCheckingEmailDuplicate && <p className="text-[10px] text-slate-500 animate-pulse">Checking for duplicates...</p>}
                         {emailError && (
                             <Alert variant="destructive" className="py-2 px-3 mt-1">
                                 <AlertCircle className="h-3 w-3" />
@@ -250,6 +254,7 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                             placeholder="+41 79 123 4567"
                             className={`border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 ${phoneError ? "border-red-500" : ""}`}
                         />
+                        {isCheckingPhoneDuplicate && <p className="text-[10px] text-slate-500 animate-pulse">Checking for duplicates...</p>}
                         {phoneError && (
                             <Alert variant="destructive" className="py-2 px-3 mt-1">
                                 <AlertCircle className="h-3 w-3" />
@@ -317,6 +322,24 @@ export function EditContactDialog({ contact, open, onOpenChange }: EditContactDi
                                 className="border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
                             />
                         </div>
+                    </div>
+
+                    {/* Status */}
+                    <div className="space-y-2">
+                        <Label htmlFor="status" className="text-slate-700">Status</Label>
+                        <Select
+                            value={formData.status}
+                            onValueChange={(v) => setFormData(prev => ({ ...prev, status: v as ContactStatus }))}
+                        >
+                            <SelectTrigger id="status" className="border-slate-300 bg-white text-slate-900">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
 
                     <DialogFooter>

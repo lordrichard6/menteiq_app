@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useContactStore } from '@/stores/contact-store'
+import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { X } from 'lucide-react'
@@ -15,20 +16,30 @@ export function TagsInput({ contactId, tags }: TagsInputProps) {
     const [inputValue, setInputValue] = useState('')
     const { updateContact } = useContactStore()
 
-    const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const handleAddTag = async (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && inputValue.trim()) {
             e.preventDefault()
             const newTag = inputValue.trim()
             const isDuplicate = tags.some(t => t.toLowerCase() === newTag.toLowerCase())
             if (!isDuplicate) {
-                updateContact(contactId, { tags: [...tags, newTag] })
+                try {
+                    await updateContact(contactId, { tags: [...tags, newTag] })
+                } catch (error) {
+                    console.error('Failed to add tag:', error)
+                    toast.error('Failed to add tag')
+                }
             }
             setInputValue('')
         }
     }
 
-    const handleRemoveTag = (tagToRemove: string) => {
-        updateContact(contactId, { tags: tags.filter(t => t !== tagToRemove) })
+    const handleRemoveTag = async (tagToRemove: string) => {
+        try {
+            await updateContact(contactId, { tags: tags.filter(t => t !== tagToRemove) })
+        } catch (error) {
+            console.error('Failed to remove tag:', error)
+            toast.error('Failed to remove tag')
+        }
     }
 
     return (
