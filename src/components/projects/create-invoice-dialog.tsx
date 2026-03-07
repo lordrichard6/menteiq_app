@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select"
 import { Plus, Trash2, FilePlus, Loader2 } from 'lucide-react'
 import { InvoiceType } from '@/lib/types/schema'
+import { toast } from 'sonner'
 
 interface CreateInvoiceDialogProps {
     projectId: string
@@ -51,6 +52,14 @@ export function CreateInvoiceDialog({
 
     const addInvoice = useInvoiceStore((state) => state.addInvoice)
 
+    const resetForm = () => {
+        setInvoiceType('swiss_qr')
+        setCurrency('CHF')
+        setDueDate('')
+        setNotes('')
+        setLineItems([{ description: '', quantity: 1, unit_price: 0, tax_rate: 8.1 }])
+    }
+
     const handleAddLineItem = () => {
         setLineItems([...lineItems, { description: '', quantity: 1, unit_price: 0, tax_rate: 8.1 }])
     }
@@ -61,7 +70,7 @@ export function CreateInvoiceDialog({
         }
     }
 
-    const handleLineItemChange = (index: number, field: keyof LineItemInput, value: any) => {
+    const handleLineItemChange = (index: number, field: keyof LineItemInput, value: string | number) => {
         const newItems = [...lineItems]
         newItems[index] = { ...newItems[index], [field]: value }
         setLineItems(newItems)
@@ -83,21 +92,18 @@ export function CreateInvoiceDialog({
                 line_items: lineItems.filter(item => item.description.trim() !== '')
             })
             setOpen(false)
-            // Reset form
-            setInvoiceType('swiss_qr')
-            setCurrency('CHF')
-            setDueDate('')
-            setNotes('')
-            setLineItems([{ description: '', quantity: 1, unit_price: 0, tax_rate: 8.1 }])
+            resetForm()
+            toast.success('Invoice created')
         } catch (error) {
             console.error('Failed to create invoice:', error)
+            toast.error('Failed to create invoice')
         } finally {
             setIsSubmitting(false)
         }
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm() }}>
             <DialogTrigger asChild>
                 <Button variant={buttonVariant} size={buttonSize} className={buttonClassName}>
                     <FilePlus className="h-4 w-4 mr-2" />
@@ -174,6 +180,8 @@ export function CreateInvoiceDialog({
                                         {index === 0 && <Label className="text-[10px] uppercase text-slate-500">Qty</Label>}
                                         <Input
                                             type="number"
+                                            min="0.01"
+                                            step="0.01"
                                             value={item.quantity}
                                             onChange={(e) => handleLineItemChange(index, 'quantity', parseFloat(e.target.value))}
                                             required
@@ -184,6 +192,7 @@ export function CreateInvoiceDialog({
                                         <Input
                                             type="number"
                                             step="0.01"
+                                            min="0"
                                             value={item.unit_price}
                                             onChange={(e) => handleLineItemChange(index, 'unit_price', parseFloat(e.target.value))}
                                             required
@@ -217,7 +226,7 @@ export function CreateInvoiceDialog({
                     </div>
 
                     <DialogFooter className="pt-4">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
+                        <Button type="button" variant="outline" onClick={() => { setOpen(false); resetForm() }} disabled={isSubmitting}>
                             Cancel
                         </Button>
                         <Button type="submit" className="bg-[#9EAE8E] hover:bg-[#7E8E6E]" disabled={isSubmitting}>

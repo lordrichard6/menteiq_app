@@ -43,14 +43,13 @@ import {
     Archive,
     CheckCircle2,
     Briefcase,
-    Plus,
-    FileText,
     Download,
     FileIcon,
     Lock,
     Trash2,
     PlusCircle,
-    Loader2
+    Loader2,
+    Globe
 } from 'lucide-react'
 import { AddTaskDialog } from '@/components/projects/add-task-dialog'
 import { UploadDocumentDialog } from '@/components/projects/upload-document-dialog'
@@ -84,7 +83,7 @@ export default function ProjectDetailPage() {
     const { contacts, fetchContacts } = useContactStore()
     const { tasks, fetchTasks, updateStatus } = useTaskStore()
     const { invoices, fetchInvoices } = useInvoiceStore()
-    const { documents, fetchDocuments } = useDocumentStore()
+    const { documents, fetchDocuments, updateDocument } = useDocumentStore()
     const project = getProject(projectId)
     const projectTasks = useMemo(() => tasks.filter(t => t.projectId === projectId), [tasks, projectId])
     const completedTasks = projectTasks.filter(t => t.status === 'done').length
@@ -189,6 +188,16 @@ export default function ProjectDetailPage() {
             link.click()
         } catch {
             toast.error('Failed to download document')
+        }
+    }
+
+    const handleVisibilityToggle = async (docId: string, currentVisibility: string) => {
+        const next = currentVisibility === 'internal' ? 'shared' : 'internal'
+        try {
+            await updateDocument(docId, { visibility: next })
+            toast.success(next === 'shared' ? 'Shared with client' : 'Set to internal')
+        } catch {
+            toast.error('Failed to update visibility')
         }
     }
 
@@ -565,6 +574,11 @@ export default function ProjectDetailPage() {
                                 projectId={projectId}
                                 budgetAmount={project.budget_amount}
                                 currency={project.budget_currency}
+                                hourlyRate={
+                                    project.custom_fields?.hourly_rate
+                                        ? Number(project.custom_fields.hourly_rate)
+                                        : undefined
+                                }
                             />
                         </div>
                     </div>
@@ -706,7 +720,21 @@ export default function ProjectDetailPage() {
                                                 </p>
                                             </div>
                                         </div>
-                                        <div className="mt-4 flex items-center justify-end gap-2">
+                                        <div className="mt-3 flex items-center justify-between gap-2">
+                                            <button
+                                                className={`flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border transition-colors ${
+                                                    doc.visibility === 'shared'
+                                                        ? 'text-blue-600 border-blue-200 bg-blue-50 hover:bg-blue-100'
+                                                        : 'text-slate-400 border-slate-200 bg-slate-50 hover:bg-slate-100'
+                                                }`}
+                                                onClick={() => handleVisibilityToggle(doc.id, doc.visibility)}
+                                                title={doc.visibility === 'shared' ? 'Click to make internal' : 'Click to share with client'}
+                                            >
+                                                {doc.visibility === 'shared'
+                                                    ? <><Globe className="h-3 w-3" /> Shared</>
+                                                    : <><Lock className="h-3 w-3" /> Internal</>
+                                                }
+                                            </button>
                                             <Button
                                                 variant="ghost"
                                                 size="sm"

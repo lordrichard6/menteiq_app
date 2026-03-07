@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { UserPlus, MoreVertical, X, Loader2, Check } from 'lucide-react'
+import { UserPlus, X, Loader2, Check } from 'lucide-react'
 import {
     Dialog,
     DialogContent,
@@ -17,12 +17,23 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
+import { toast } from 'sonner'
 
 interface Profile {
     id: string
@@ -48,9 +59,12 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
     const [isLoading, setIsLoading] = useState(true)
     const [isAdding, setIsAdding] = useState(false)
     const [availableUsers, setAvailableUsers] = useState<Profile[]>([])
+    const [isLoadingUsers, setIsLoadingUsers] = useState(false)
     const [selectedUserId, setSelectedUserId] = useState<string>('')
     const [selectedRole, setSelectedRole] = useState<'manager' | 'contributor' | 'viewer'>('contributor')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [memberToRemove, setMemberToRemove] = useState<ProjectMember | null>(null)
+    const [isRemoving, setIsRemoving] = useState(false)
 
     const fetchMembers = useCallback(async () => {
         setIsLoading(true)
@@ -71,16 +85,16 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
             .eq('project_id', projectId)
 
         if (!error && data) {
-            setMembers(data as any)
+            setMembers(data as unknown as ProjectMember[])
         }
         setIsLoading(false)
     }, [projectId])
 
     const fetchAvailableUsers = async () => {
+        setIsLoadingUsers(true)
         const supabase = createClient()
-        // Get current tenant_id
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        if (!user) { setIsLoadingUsers(false); return }
 
         const { data: profile } = await supabase
             .from('profiles')
@@ -88,9 +102,8 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
             .eq('id', user.id)
             .single()
 
-        if (!profile) return
+        if (!profile) { setIsLoadingUsers(false); return }
 
-        // Get all users in the same tenant who are NOT already members
         const currentMemberIds = members.map(m => m.user_id)
 
         const { data: users, error } = await supabase
@@ -102,6 +115,7 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
         if (!error && users) {
             setAvailableUsers(users)
         }
+        setIsLoadingUsers(false)
     }
 
     useEffect(() => {
@@ -111,34 +125,55 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
     const handleAddMember = async () => {
         if (!selectedUserId) return
         setIsSubmitting(true)
-        const supabase = createClient()
-        const { error } = await supabase
-            .from('project_members')
-            .insert({
-                project_id: projectId,
-                user_id: selectedUserId,
-                role: selectedRole
-            })
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('project_members')
+                .insert({
+                    project_id: projectId,
+                    user_id: selectedUserId,
+                    role: selectedRole
+                })
 
-        if (!error) {
+            if (error) throw error
+
             await fetchMembers()
             setIsAdding(false)
             setSelectedUserId('')
-        }
-        setIsSubmitting(false)
-    }
-
-    const handleRemoveMember = async (memberId: string) => {
-        const supabase = createClient()
-        const { error } = await supabase
-            .from('project_members')
-            .delete()
-            .eq('id', memberId)
-
-        if (!error) {
-            setMembers(members.filter(m => m.id !== memberId))
+            setSelectedRole('contributor')
+            toast.success('Team member added')
+        } catch {
+            toast.error('Failed to add team member')
+        } finally {
+            setIsSubmitting(false)
         }
     }
+
+    const handleConfirmRemove = async () => {
+        if (!memberToRemove) return
+        setIsRemoving(true)
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('project_members')
+                .delete()
+                .eq('id', memberToRemove.id)
+
+            if (error) throw error
+
+            setMembers(members.filter(m => m.id !== memberToRemove.id))
+            toast.success('Team member removed')
+        } catch {
+            toast.error('Failed to remove team member')
+        } finally {
+            setIsRemoving(false)
+            setMemberToRemove(null)
+        }
+    }
+
+    const memberToRemoveName = memberToRemove
+        ? `${memberToRemove.profiles.first_name ?? ''} ${memberToRemove.profiles.last_name ?? ''}`.trim()
+        : ''
 
     return (
         <Card className="border-slate-200 shadow-sm overflow-hidden">
@@ -150,6 +185,7 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
                 <Dialog open={isAdding} onOpenChange={(open) => {
                     setIsAdding(open)
                     if (open) fetchAvailableUsers()
+                    else { setSelectedUserId(''); setSelectedRole('contributor') }
                 }}>
                     <DialogTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-[#9EAE8E] hover:text-[#7E8E6E] hover:bg-slate-50">
@@ -164,9 +200,12 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
                         <div className="grid gap-4 py-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Select Colleague</label>
-                                <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                                <Select value={selectedUserId} onValueChange={setSelectedUserId} disabled={isLoadingUsers}>
                                     <SelectTrigger>
-                                        <SelectValue placeholder="Select user..." />
+                                        {isLoadingUsers
+                                            ? <span className="flex items-center gap-2 text-slate-400"><Loader2 className="h-3.5 w-3.5 animate-spin" />Loading users...</span>
+                                            : <SelectValue placeholder="Select user..." />
+                                        }
                                     </SelectTrigger>
                                     <SelectContent>
                                         {availableUsers.length === 0 ? (
@@ -183,7 +222,7 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Assign Role</label>
-                                <Select value={selectedRole} onValueChange={(v: any) => setSelectedRole(v)}>
+                                <Select value={selectedRole} onValueChange={(v) => setSelectedRole(v as typeof selectedRole)}>
                                     <SelectTrigger>
                                         <SelectValue />
                                     </SelectTrigger>
@@ -196,7 +235,7 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
+                            <Button variant="outline" onClick={() => setIsAdding(false)} disabled={isSubmitting}>Cancel</Button>
                             <Button
                                 className="bg-[#9EAE8E] hover:bg-[#7E8E6E]"
                                 onClick={handleAddMember}
@@ -242,7 +281,7 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-600 transition-all"
-                                    onClick={() => handleRemoveMember(member.id)}
+                                    onClick={() => setMemberToRemove(member)}
                                 >
                                     <X className="h-3.5 w-3.5" />
                                 </Button>
@@ -251,6 +290,27 @@ export function ProjectTeamSection({ projectId }: ProjectTeamSectionProps) {
                     </div>
                 )}
             </CardContent>
+
+            <AlertDialog open={!!memberToRemove} onOpenChange={(open) => { if (!open) setMemberToRemove(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[#3D4A67]">Remove Team Member?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Remove <span className="font-semibold">{memberToRemoveName}</span> from this project? They will lose access to project details.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isRemoving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmRemove}
+                            className="bg-red-600 hover:bg-red-700 text-white border-0"
+                            disabled={isRemoving}
+                        >
+                            {isRemoving ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Removing...</> : 'Remove'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </Card>
     )
 }

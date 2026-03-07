@@ -6,20 +6,22 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { useInvoiceStore } from '@/stores/invoice-store'
 import { useTimeStore } from '@/stores/time-store'
-import { Wallet, Receipt, CheckCircle2, TrendingUp, BarChart3, Clock } from 'lucide-react'
+import { CheckCircle2, TrendingUp, BarChart3, Clock } from 'lucide-react'
 
 interface ProjectBudgetStatsProps {
     projectId: string
     budgetAmount?: number
     currency?: string
+    hourlyRate?: number
 }
 
-const DEFAULT_HOURLY_RATE = 100 // CHF/hr (could be moved to project setting later)
+const DEFAULT_HOURLY_RATE = 100 // CHF/hr fallback
 
 export function ProjectBudgetStats({
     projectId,
     budgetAmount = 0,
-    currency = 'CHF'
+    currency = 'CHF',
+    hourlyRate = DEFAULT_HOURLY_RATE
 }: ProjectBudgetStatsProps) {
     const { invoices, fetchInvoices } = useInvoiceStore()
     const { timeEntries, fetchTimeEntries } = useTimeStore()
@@ -38,7 +40,7 @@ export function ProjectBudgetStats({
 
         // Time stats
         const totalMinutes = timeEntries.reduce((sum, entry) => sum + entry.duration_minutes, 0)
-        const actualCost = (totalMinutes / 60) * DEFAULT_HOURLY_RATE
+        const actualCost = (totalMinutes / 60) * hourlyRate
         const profitability = totalInvoiced - actualCost
         const profitMargin = totalInvoiced > 0 ? (profitability / totalInvoiced) * 100 : 0
 
@@ -53,7 +55,7 @@ export function ProjectBudgetStats({
             utilization: Math.min(Math.round(utilization), 100),
             isOverBudget: totalInvoiced > budgetAmount && budgetAmount > 0
         }
-    }, [invoices, timeEntries, budgetAmount])
+    }, [invoices, timeEntries, budgetAmount, hourlyRate])
 
     const formatCurrency = (amount: number) => {
         return new Intl.NumberFormat('de-CH', {
@@ -121,7 +123,7 @@ export function ProjectBudgetStats({
                             </span>
                         </div>
                         <div className="flex justify-between items-center text-[10px] text-slate-500">
-                            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Actual Cost (Labor)</span>
+                            <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Actual Cost (Labor @ {formatCurrency(hourlyRate)}/h)</span>
                             <span>{formatCurrency(stats.actualCost)}</span>
                         </div>
                     </div>

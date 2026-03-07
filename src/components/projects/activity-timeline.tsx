@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import React, { useEffect } from 'react'
 import { useActivityStore } from '@/stores/activity-store'
 import { format } from 'date-fns'
 import {
@@ -11,7 +11,9 @@ import {
     MessageSquare,
     RefreshCcw,
     User,
-    Clock
+    Clock,
+    Loader2,
+    AlertCircle
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -21,7 +23,7 @@ interface ActivityTimelineProps {
     projectId: string
 }
 
-const EVENT_ICONS: Record<ActivityEventType, any> = {
+const EVENT_ICONS: Record<ActivityEventType, React.ElementType> = {
     created: PlusCircle,
     updated: RefreshCcw,
     deleted: Clock, // Use clock as fallback for system/delete
@@ -58,7 +60,7 @@ const EVENT_COLORS: Record<ActivityEventType, string> = {
 }
 
 export function ActivityTimeline({ projectId }: ActivityTimelineProps) {
-    const { activities, fetchActivities, isLoading } = useActivityStore()
+    const { activities, fetchActivities, isLoading, error } = useActivityStore()
 
     useEffect(() => {
         fetchActivities({ entityId: projectId, entityType: 'project' })
@@ -66,9 +68,25 @@ export function ActivityTimeline({ projectId }: ActivityTimelineProps) {
 
     if (isLoading && activities.length === 0) {
         return (
-            <div className="flex items-center justify-center p-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#3D4A67]"></div>
-            </div>
+            <Card className="border-slate-200">
+                <CardContent className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (error && activities.length === 0) {
+        return (
+            <Card className="border-slate-200">
+                <CardHeader>
+                    <CardTitle className="text-lg">Project Activity</CardTitle>
+                </CardHeader>
+                <CardContent className="flex items-center gap-2 text-sm text-red-500">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    Failed to load activity. Please refresh the page.
+                </CardContent>
+            </Card>
         )
     }
 
@@ -95,7 +113,7 @@ export function ActivityTimeline({ projectId }: ActivityTimelineProps) {
             </CardHeader>
             <CardContent>
                 <div className="relative space-y-6 before:absolute before:inset-0 before:ml-5 before:-translate-x-px before:h-full before:w-0.5 before:bg-slate-200">
-                    {activities.map((activity, index) => {
+                    {activities.map((activity) => {
                         const Icon = EVENT_ICONS[activity.eventType] || Clock
                         const colorClass = EVENT_COLORS[activity.eventType] || 'text-slate-500 bg-slate-50'
 

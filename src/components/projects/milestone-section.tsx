@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useMilestoneStore } from '@/stores/milestone-store'
+import { Milestone } from '@/types/milestone'
 import { useTaskStore } from '@/stores/task-store'
 import { useTimeStore } from '@/stores/time-store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -9,7 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Plus, Flag, Calendar, MoreVertical, CheckCircle2, Circle, Clock, Loader2, BarChart3 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, isBefore, startOfDay } from 'date-fns'
+import { toast } from 'sonner'
 import {
     Dialog,
     DialogContent,
@@ -41,6 +43,11 @@ export function MilestoneSection({ projectId }: MilestoneSectionProps) {
     const completedCount = milestones.filter(m => m.status === 'completed').length
     const progress = milestones.length > 0 ? (completedCount / milestones.length) * 100 : 0
 
+    const resetAddForm = () => {
+        setNewName('')
+        setNewDueDate('')
+    }
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!newName || isSubmitting) return
@@ -54,16 +61,22 @@ export function MilestoneSection({ projectId }: MilestoneSectionProps) {
                 order_index: milestones.length
             })
             setIsAddOpen(false)
-            setNewName('')
-            setNewDueDate('')
+            resetAddForm()
+            toast.success('Milestone created')
+        } catch {
+            toast.error('Failed to create milestone')
         } finally {
             setIsSubmitting(false)
         }
     }
 
-    const toggleStatus = async (milestone: any) => {
+    const toggleStatus = async (milestone: Milestone) => {
         const nextStatus = milestone.status === 'completed' ? 'pending' : 'completed'
-        await updateMilestone(milestone.id, { status: nextStatus })
+        try {
+            await updateMilestone(milestone.id, { status: nextStatus })
+        } catch {
+            toast.error('Failed to update milestone')
+        }
     }
 
     return (
@@ -144,12 +157,16 @@ export function MilestoneSection({ projectId }: MilestoneSectionProps) {
                                                 <p className={`font-semibold text-sm truncate ${m.status === 'completed' ? 'text-slate-400 line-through' : 'text-[#3D4A67]'}`}>
                                                     {m.name}
                                                 </p>
-                                                {m.due_date && (
-                                                    <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
-                                                        <Clock className="h-3 w-3" />
-                                                        {format(new Date(m.due_date), 'MMM d, yyyy')}
-                                                    </div>
-                                                )}
+                                                {m.due_date && (() => {
+                                                    const isOverdue = m.status !== 'completed' && isBefore(new Date(m.due_date), startOfDay(new Date()))
+                                                    return (
+                                                        <div className={`flex items-center gap-1 text-[10px] mt-0.5 ${isOverdue ? 'text-red-500 font-semibold' : 'text-slate-400'}`}>
+                                                            <Clock className="h-3 w-3" />
+                                                            {format(new Date(m.due_date), 'MMM d, yyyy')}
+                                                            {isOverdue && <span className="text-red-400">(overdue)</span>}
+                                                        </div>
+                                                    )
+                                                })()}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-1">
@@ -183,7 +200,7 @@ export function MilestoneSection({ projectId }: MilestoneSectionProps) {
                 </div>
             </CardContent>
 
-            <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+            <Dialog open={isAddOpen} onOpenChange={(v) => { setIsAddOpen(v); if (!v) resetAddForm() }}>
                 <DialogContent className="sm:max-w-[425px]">
                     <form onSubmit={handleAdd}>
                         <DialogHeader>
@@ -222,7 +239,7 @@ export function MilestoneSection({ projectId }: MilestoneSectionProps) {
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setIsAddOpen(false)}
+                                onClick={() => { setIsAddOpen(false); resetAddForm() }}
                                 disabled={isSubmitting}
                                 className="border-slate-200"
                             >

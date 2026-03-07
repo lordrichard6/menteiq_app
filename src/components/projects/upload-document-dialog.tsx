@@ -23,6 +23,7 @@ import {
 import { useDocumentStore } from '@/stores/document-store'
 import { DocVisibility } from '@/types/document'
 import { Upload, Loader2, FileUp, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface UploadDocumentDialogProps {
     projectId: string
@@ -48,6 +49,13 @@ export function UploadDocumentDialog({
 
     const uploadDocument = useDocumentStore((state) => state.uploadDocument)
 
+    const resetForm = () => {
+        setFile(null)
+        setName('')
+        setVisibility('internal')
+        if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0]
         if (selectedFile) {
@@ -68,12 +76,12 @@ export function UploadDocumentDialog({
                 contactId,
                 visibility,
             })
-            setFile(null)
-            setName('')
-            setVisibility('internal')
+            resetForm()
             setOpen(false)
+            toast.success('Document uploaded')
         } catch (error) {
             console.error('Failed to upload document:', error)
+            toast.error('Failed to upload document')
         } finally {
             setIsSubmitting(false)
         }
@@ -81,11 +89,12 @@ export function UploadDocumentDialog({
 
     const clearFile = () => {
         setFile(null)
+        setName('')
         if (fileInputRef.current) fileInputRef.current.value = ''
     }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) resetForm() }}>
             <DialogTrigger asChild>
                 <Button variant={buttonVariant} size={buttonSize} className={buttonClassName}>
                     <Upload className="h-4 w-4 mr-2" />
@@ -176,7 +185,7 @@ export function UploadDocumentDialog({
                         <Button
                             type="button"
                             variant="outline"
-                            onClick={() => setOpen(false)}
+                            onClick={() => { setOpen(false); resetForm() }}
                             disabled={isSubmitting}
                         >
                             Cancel

@@ -10,27 +10,32 @@ interface DocumentStore {
     // Actions
     fetchDocuments: (projectId?: string) => Promise<void>
     uploadDocument: (file: File, input: CreateDocumentInput) => Promise<ProjectDocument | null>
+    updateDocument: (id: string, updates: Partial<Pick<ProjectDocument, 'name' | 'visibility'>>) => Promise<void>
     deleteDocument: (id: string) => Promise<void>
 }
 
-function dbToDocument(row: any): ProjectDocument {
+function dbToDocument(row: Record<string, unknown>): ProjectDocument {
     return {
-        id: row.id,
-        name: row.name,
-        filePath: row.file_path,
-        fileType: row.file_type,
-        sizeBytes: row.size_bytes,
-        visibility: row.visibility,
-        embeddingStatus: row.embedding_status,
-        contentSummary: row.content_summary,
-        projectId: row.project_id,
-        contactId: row.contact_id,
-        createdAt: new Date(row.created_at),
-        updatedAt: new Date(row.updated_at),
+        id: row.id as string,
+        name: row.name as string,
+        filePath: row.file_path as string,
+        fileType: row.file_type as string,
+        sizeBytes: row.size_bytes as number,
+        visibility: row.visibility as ProjectDocument['visibility'],
+        embeddingStatus: row.embedding_status as string,
+        contentSummary: row.content_summary as string | null,
+        projectId: row.project_id as string | null,
+        contactId: row.contact_id as string | null,
+        createdAt: new Date(row.created_at as string),
+        updatedAt: new Date(row.updated_at as string),
     }
 }
 
-export const useDocumentStore = create<DocumentStore>()((set, get) => ({
+function errMsg(error: unknown): string {
+    return error instanceof Error ? error.message : 'Unknown error'
+}
+
+export const useDocumentStore = create<DocumentStore>()((set) => ({
     documents: [],
     isLoading: false,
     error: null,
@@ -52,11 +57,11 @@ export const useDocumentStore = create<DocumentStore>()((set, get) => ({
 
             if (error) throw error
 
-            const documents = (data || []).map(dbToDocument)
+            const documents = (data || []).map((row) => dbToDocument(row as Record<string, unknown>))
             set({ documents, isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching documents:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: errMsg(error), isLoading: false })
         }
     },
 
@@ -108,16 +113,43 @@ export const useDocumentStore = create<DocumentStore>()((set, get) => ({
 
             if (dbError) throw dbError
 
-            const newDoc = dbToDocument(data)
+            const newDoc = dbToDocument(data as Record<string, unknown>)
             set((state) => ({
                 documents: [newDoc, ...state.documents],
                 isLoading: false
             }))
             return newDoc
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error uploading document:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: errMsg(error), isLoading: false })
             return null
+        }
+    },
+
+    updateDocument: async (id, updates) => {
+        set({ error: null })
+        try {
+            const supabase = createClient()
+            const dbUpdates: Record<string, string> = {}
+            if (updates.name !== undefined) dbUpdates.name = updates.name
+            if (updates.visibility !== undefined) dbUpdates.visibility = updates.visibility
+
+            const { error } = await supabase
+                .from('documents')
+                .update(dbUpdates)
+                .eq('id', id)
+
+            if (error) throw error
+
+            set((state) => ({
+                documents: state.documents.map((d) =>
+                    d.id === id ? { ...d, ...updates } : d
+                ),
+            }))
+        } catch (error: unknown) {
+            console.error('Error updating document:', error)
+            set({ error: errMsg(error) })
+            throw error
         }
     },
 
@@ -149,9 +181,9 @@ export const useDocumentStore = create<DocumentStore>()((set, get) => ({
             set((state) => ({
                 documents: state.documents.filter((d) => d.id !== id),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error deleting document:', error)
-            set({ error: error.message })
+            set({ error: errMsg(error) })
         }
     },
 }))

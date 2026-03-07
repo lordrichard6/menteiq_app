@@ -9,9 +9,19 @@ import { WeeklyTimesheetView } from './weekly-timesheet-view'
 import { LogTimeDialog } from './log-time-dialog'
 import { useTaskStore } from '@/stores/task-store'
 import { format } from 'date-fns'
-import { Clock, Plus, Trash2, User, CheckCircle2, XCircle, List, Calendar as CalendarIcon } from 'lucide-react'
+import { Plus, Trash2, CheckCircle2, XCircle, List, Calendar as CalendarIcon, Loader2 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { toast } from 'sonner'
 
 interface ProjectTimeTabProps {
     projectId: string
@@ -22,6 +32,8 @@ export function ProjectTimeTab({ projectId }: ProjectTimeTabProps) {
     const { tasks } = useTaskStore()
     const [isLogTimeOpen, setIsLogTimeOpen] = useState(false)
     const [viewMode, setViewMode] = useState<'list' | 'weekly'>('list')
+    const [entryToDelete, setEntryToDelete] = useState<string | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     useEffect(() => {
         fetchTimeEntries(projectId)
@@ -39,6 +51,20 @@ export function ProjectTimeTab({ projectId }: ProjectTimeTabProps) {
     }
 
     const billablePercentage = totalMinutes > 0 ? (billableMinutes / totalMinutes) * 100 : 0
+
+    const handleConfirmDelete = async () => {
+        if (!entryToDelete) return
+        setIsDeleting(true)
+        try {
+            await deleteTimeEntry(entryToDelete)
+            toast.success('Time entry deleted')
+        } catch {
+            toast.error('Failed to delete time entry')
+        } finally {
+            setIsDeleting(false)
+            setEntryToDelete(null)
+        }
+    }
 
     return (
         <div className="space-y-6">
@@ -117,7 +143,7 @@ export function ProjectTimeTab({ projectId }: ProjectTimeTabProps) {
                         <table className="w-full text-left text-sm">
                             <thead>
                                 <tr className="bg-slate-50 border-b border-slate-200">
-                                    <th className="px-6 py-4 font-semibold text-[#3D4A67]">User & Work</th>
+                                    <th className="px-6 py-4 font-semibold text-[#3D4A67]">User &amp; Work</th>
                                     <th className="px-6 py-4 font-semibold text-[#3D4A67]">Date</th>
                                     <th className="px-6 py-4 font-semibold text-[#3D4A67]">Billable</th>
                                     <th className="px-6 py-4 font-semibold text-[#3D4A67]">Duration</th>
@@ -172,7 +198,7 @@ export function ProjectTimeTab({ projectId }: ProjectTimeTabProps) {
                                                     variant="ghost"
                                                     size="icon"
                                                     className="h-8 w-8 text-slate-400 hover:text-red-500 transition-colors"
-                                                    onClick={() => deleteTimeEntry(entry.id)}
+                                                    onClick={() => setEntryToDelete(entry.id)}
                                                 >
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
@@ -191,6 +217,27 @@ export function ProjectTimeTab({ projectId }: ProjectTimeTabProps) {
                 onOpenChange={setIsLogTimeOpen}
                 projectId={projectId}
             />
+
+            <AlertDialog open={!!entryToDelete} onOpenChange={(open) => { if (!open) setEntryToDelete(null) }}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle className="text-[#3D4A67]">Delete Time Entry?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently remove the time entry. This action cannot be undone and may affect billing calculations.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleConfirmDelete}
+                            className="bg-red-600 hover:bg-red-700 text-white border-0"
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Deleting...</> : 'Delete'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }
