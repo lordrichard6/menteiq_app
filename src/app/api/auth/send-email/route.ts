@@ -127,10 +127,16 @@ export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text()
 
+    // DEBUG: log all headers so we can see exactly what Supabase sends
+    const allHeaders: Record<string, string> = {}
+    req.headers.forEach((value, key) => { allHeaders[key] = value })
+    console.log('[send-email hook] Headers:', JSON.stringify(allHeaders))
+    console.log('[send-email hook] Body preview:', rawBody.slice(0, 200))
+
     // Verify Supabase signature
     const isValid = await verifySignature(req, rawBody)
     if (!isValid) {
-      console.error('[send-email hook] Invalid signature')
+      console.error('[send-email hook] Invalid signature — auth header:', req.headers.get('authorization'))
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
