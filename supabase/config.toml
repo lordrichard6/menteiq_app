@@ -51,6 +51,15 @@ sign_in_sign_ups = 100
 token_refresh = 300
 token_verifications = 100
 
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "noreply@menteiq.ch"
+sender_name = "MenteIQ"
+
 [auth.hook.send_email]
 enabled = true
 uri = "https://app.menteiq.ch/api/auth/send-email"
