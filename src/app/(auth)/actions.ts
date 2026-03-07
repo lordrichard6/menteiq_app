@@ -29,8 +29,8 @@ export async function login(formData: FormData) {
 
     revalidatePath('/', 'layout')
 
-    // Use new role enum: 'owner' and 'member'
-    if (profile?.role === 'owner') {
+    // platform_admin and owner go to dashboard, member goes to portal
+    if (profile?.role === 'owner' || profile?.role === 'platform_admin') {
         redirect('/dashboard')
     } else {
         redirect('/portal/dashboard')
@@ -56,11 +56,34 @@ export async function signUp(formData: FormData) {
     })
 
     if (error) {
+        // Friendly message for duplicate email
+        if (
+            error.message.toLowerCase().includes('already registered') ||
+            error.message.toLowerCase().includes('user already exists')
+        ) {
+            return { error: 'An account with this email already exists. Try signing in instead.' }
+        }
         return { error: error.message }
     }
 
     revalidatePath('/', 'layout')
-    redirect('/dashboard')
+    // Always redirect to verify-email — Supabase requires email confirmation by default
+    redirect(`/verify-email?email=${encodeURIComponent(email)}`)
+}
+
+export async function resendConfirmation(email: string) {
+    const supabase = await createClient()
+
+    const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+    })
+
+    if (error) {
+        return { error: error.message }
+    }
+
+    return { success: true }
 }
 
 export async function signInWithGoogle() {

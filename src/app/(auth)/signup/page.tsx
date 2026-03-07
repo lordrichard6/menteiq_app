@@ -5,23 +5,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import Image from "next/image"
-import { Mail, Lock, ArrowRight, User, ShieldCheck, MapPin, Globe } from 'lucide-react'
+import { Mail, Lock, ArrowRight, User, ShieldCheck, Globe } from 'lucide-react'
 import { signUp, signInWithGoogle } from "../actions"
-import { useActionState } from "react"
+import { useActionState, useState } from "react"
 
 export default function SignupPage() {
-    const [state, formAction, isPending] = useActionState(async (_prev: any, formData: FormData) => {
+    const [state, formAction, isPending] = useActionState(async (_prev: unknown, formData: FormData) => {
         const res = await signUp(formData);
         if (res?.error) return { error: res.error };
         return null;
     }, null);
 
+    const [googleError, setGoogleError] = useState<string | null>(null)
+    const [googlePending, setGooglePending] = useState(false)
+
     const handleGoogleSignIn = async () => {
+        setGoogleError(null)
+        setGooglePending(true)
         const res = await signInWithGoogle();
         if (res?.error) {
-            // If there's an error, we stay on the page
-            console.error('Google sign-in error:', res.error);
+            setGoogleError(res.error)
+            setGooglePending(false)
         }
+        // On success, signInWithGoogle() redirects — googlePending stays true during navigation
     };
 
     return (
@@ -58,6 +64,7 @@ export default function SignupPage() {
                                     type="text"
                                     placeholder="John Doe"
                                     required
+                                    autoFocus
                                     className="pl-10 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
                                 />
                             </div>
@@ -90,13 +97,14 @@ export default function SignupPage() {
                                     type="password"
                                     placeholder="••••••••"
                                     required
-                                    minLength={6}
+                                    minLength={8}
                                     className="pl-10 border-slate-300 bg-white text-slate-900 placeholder:text-slate-400"
                                 />
                             </div>
+                            <p className="text-xs text-slate-400">Minimum 8 characters</p>
                         </div>
                         <Button type="submit" disabled={isPending} className="w-full bg-[#3D4A67] hover:bg-[#2D3A57] text-white gap-2">
-                            {isPending ? 'Creating account...' : 'Create Account'}
+                            {isPending ? 'Creating account…' : 'Create Account'}
                             <ArrowRight className="h-4 w-4" />
                         </Button>
                     </form>
@@ -110,10 +118,17 @@ export default function SignupPage() {
                         </div>
                     </div>
 
+                    {googleError && (
+                        <div className="bg-red-50 text-red-600 text-sm p-3 rounded-md">
+                            {googleError}
+                        </div>
+                    )}
+
                     <Button
                         variant="outline"
                         className="w-full border-slate-300 text-slate-700 hover:bg-slate-50"
                         onClick={handleGoogleSignIn}
+                        disabled={googlePending}
                     >
                         <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -121,7 +136,7 @@ export default function SignupPage() {
                             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                         </svg>
-                        Sign up with Google
+                        {googlePending ? 'Redirecting…' : 'Sign up with Google'}
                     </Button>
 
                     <p className="text-center text-sm text-slate-500">

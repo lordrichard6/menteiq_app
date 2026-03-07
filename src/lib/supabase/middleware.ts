@@ -3,7 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // Routes that don't require authentication
-const publicRoutes = ['/login', '/signup', '/forgot-password', '/privacy', '/terms', '/', '/auth/callback']
+const publicRoutes = ['/login', '/signup', '/forgot-password', '/verify-email', '/privacy', '/terms', '/', '/auth/callback']
 
 export async function updateSession(request: NextRequest) {
     // Skip Supabase initialization if env vars are not set (allows landing page to work)
@@ -58,28 +58,21 @@ export async function updateSession(request: NextRequest) {
             .eq('id', user.id)
             .single()
 
-        // Use 'owner' and 'member' (new role enum) - default to 'member'
+        // Role hierarchy: platform_admin > owner > member
         const role = profile?.role || 'member'
+        const isAdmin = role === 'owner' || role === 'platform_admin'
 
-        // 1. Redirect authenticated users away from login page
-        if (path === '/login') {
-            if (role === 'owner') {
-                return NextResponse.redirect(new URL('/dashboard', request.url))
-            } else {
-                return NextResponse.redirect(new URL('/portal/dashboard', request.url))
-            }
+        // 1. Redirect authenticated users away from auth pages
+        if (path === '/login' || path === '/signup' || path === '/verify-email') {
+            return NextResponse.redirect(new URL(isAdmin ? '/dashboard' : '/portal/dashboard', request.url))
         }
 
-        // 2. Root Redirect based on role
+        // 2. Root redirect based on role
         if (path === '/') {
-            if (role === 'owner') {
-                return NextResponse.redirect(new URL('/dashboard', request.url))
-            } else {
-                return NextResponse.redirect(new URL('/portal/dashboard', request.url))
-            }
+            return NextResponse.redirect(new URL(isAdmin ? '/dashboard' : '/portal/dashboard', request.url))
         }
 
-        // 3. Protect Admin Routes from Members
+        // 3. Protect admin/owner routes from members
         // Members can only access /portal routes
         if (role === 'member' && !path.startsWith('/portal')) {
             return NextResponse.redirect(new URL('/portal/dashboard', request.url))
