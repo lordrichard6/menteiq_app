@@ -40,6 +40,13 @@ export interface InvoiceWithLineItems extends Invoice {
         company_name: string | null
         is_company: boolean
         email: string | null
+        phone: string | null
+        address_line1: string | null
+        address_line2: string | null
+        city: string | null
+        state: string | null
+        postal_code: string | null
+        country: string | null
     } | null
 }
 
@@ -54,8 +61,9 @@ interface InvoiceStore {
     addInvoice: (input: CreateInvoiceInput) => Promise<InvoiceWithLineItems | null>
     updateInvoice: (id: string, updates: Partial<Invoice>, lineItems?: LineItemInput[]) => Promise<void>
     deleteInvoice: (id: string) => Promise<boolean>
-    markAsPaid: (id: string) => Promise<boolean>
+    markAsPaid: (id: string, paidAt?: string) => Promise<boolean>
     markAsSent: (id: string) => Promise<boolean>
+    cancelInvoice: (id: string) => Promise<boolean>
     createPaymentLink: (id: string) => Promise<string | null>
     getInvoice: (id: string) => InvoiceWithLineItems | undefined
 }
@@ -102,6 +110,7 @@ async function generateInvoiceNumber(tenantId: string): Promise<string> {
     return `${prefix}-${year}-${paddedNumber}`
 }
 
+/** Used in list queries — contact without address */
 const INVOICE_SELECT = `
     *,
     contacts (
@@ -111,6 +120,26 @@ const INVOICE_SELECT = `
         company_name,
         is_company,
         email
+    )
+`
+
+/** Used in single-invoice queries — includes full contact address for PDF pre-flight */
+const INVOICE_SELECT_DETAIL = `
+    *,
+    contacts (
+        id,
+        first_name,
+        last_name,
+        company_name,
+        is_company,
+        email,
+        phone,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        postal_code,
+        country
     )
 `
 
@@ -189,11 +218,17 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
 
             const { data: invoice, error } = await supabase
                 .from('invoices')
-                .select(INVOICE_SELECT)
+                .select(INVOICE_SELECT_DETAIL)
                 .eq('id', id)
                 .single()
 
-            if (error) throw error
+            if (error) {
+                // Distinguish not-found from network errors
+                if (error.code === 'PGRST116') {
+                    throw new Error('INVOICE_NOT_FOUND')
+                }
+                throw error
+            }
 
             const { data: lineItems } = await supabase
                 .from('invoice_line_items')
@@ -201,8 +236,20 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
                 .eq('invoice_id', id)
                 .order('sort_order', { ascending: true })
 
+            // Auto-mark as overdue if sent and past due date
+            const today = new Date().toISOString().split('T')[0]
+            let status = invoice.status as InvoiceStatus
+            if (status === 'sent' && invoice.due_date && invoice.due_date < today) {
+                status = 'overdue'
+                await supabase
+                    .from('invoices')
+                    .update({ status: 'overdue' })
+                    .eq('id', id)
+            }
+
             const full: InvoiceWithLineItems = {
                 ...invoice,
+                status,
                 contact:    invoice.contacts as InvoiceWithLineItems['contact'],
                 line_items: lineItems ?? [],
             }
@@ -382,7 +429,7 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         }
     },
 
-    markAsPaid: async (id) => {
+    markAsPaid: async (id, paidAt) => {
         // Validate state transition
         const current = get().invoices.find(i => i.id === id)
         if (current && !['sent', 'overdue'].includes(current.status)) {
@@ -392,11 +439,12 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
         set({ error: null })
         try {
             const supabase = createClient()
+            const paidAtValue = paidAt ?? new Date().toISOString()
             const { error } = await supabase
                 .from('invoices')
                 .update({
                     status:  'paid',
-                    paid_at: new Date().toISOString(),
+                    paid_at: paidAtValue,
                 })
                 .eq('id', id)
 
@@ -405,7 +453,7 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             set((state) => ({
                 invoices: state.invoices.map(i =>
                     i.id === id
-                        ? { ...i, status: 'paid' as InvoiceStatus, paid_at: new Date().toISOString() }
+                        ? { ...i, status: 'paid' as InvoiceStatus, paid_at: paidAtValue }
                         : i
                 ),
             }))
@@ -436,6 +484,35 @@ export const useInvoiceStore = create<InvoiceStore>()((set, get) => ({
             set((state) => ({
                 invoices: state.invoices.map(i =>
                     i.id === id ? { ...i, status: 'sent' as InvoiceStatus } : i
+                ),
+            }))
+            return true
+        } catch (error: unknown) {
+            set({ error: errMsg(error) })
+            return false
+        }
+    },
+
+    cancelInvoice: async (id) => {
+        // Validate state transition — can cancel draft, sent, or overdue invoices
+        const current = get().invoices.find(i => i.id === id)
+        if (current && !['draft', 'sent', 'overdue'].includes(current.status)) {
+            set({ error: `Cannot cancel invoice: status is '${current.status}'` })
+            return false
+        }
+        set({ error: null })
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('invoices')
+                .update({ status: 'cancelled' })
+                .eq('id', id)
+
+            if (error) throw error
+
+            set((state) => ({
+                invoices: state.invoices.map(i =>
+                    i.id === id ? { ...i, status: 'cancelled' as InvoiceStatus } : i
                 ),
             }))
             return true

@@ -2,10 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useInvoiceStore } from '@/stores/invoice-store'
+import type { InvoiceWithLineItems } from '@/stores/invoice-store'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
     Table,
     TableBody,
@@ -31,9 +35,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import {
-    ArrowLeft,
+    ChevronRight,
     FileText,
     MoreHorizontal,
     Send,
@@ -42,8 +53,16 @@ import {
     Copy,
     Trash2,
     Loader2,
+    Pencil,
+    Files,
+    Ban,
+    MapPin,
 } from 'lucide-react'
 import type { InvoiceStatus } from '@/lib/types/schema'
+import { EditInvoiceDialog } from '@/components/modules/invoicing/edit-invoice-dialog'
+import { CreateInvoiceDialog } from '@/components/modules/invoicing/create-invoice-dialog'
+
+// ─── Constants ───────────────────────────────────────────────────────────────
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
     draft: 'Draft',
@@ -60,6 +79,8 @@ const STATUS_COLORS: Record<InvoiceStatus, string> = {
     overdue: 'bg-red-100 text-red-700',
     cancelled: 'bg-gray-100 text-gray-500',
 }
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function formatMoney(amount: number, currency: string): string {
     return new Intl.NumberFormat('de-CH', {
@@ -78,22 +99,45 @@ function formatDate(dateStr: string | null | undefined): string {
     })
 }
 
+function buildDuplicateLineItems(invoice: InvoiceWithLineItems) {
+    return invoice.line_items.map(item => ({
+        id: `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        tax_rate: item.tax_rate,
+        sort_order: item.sort_order,
+    }))
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 export default function InvoiceDetailPage() {
     const params = useParams()
     const router = useRouter()
     const invoiceId = params.id as string
 
-    const { invoices, fetchInvoice, markAsSent, markAsPaid, createPaymentLink, deleteInvoice, isLoading, error } =
+    const { invoices, fetchInvoice, markAsSent, markAsPaid, cancelInvoice, createPaymentLink, deleteInvoice, isLoading, error } =
         useInvoiceStore()
 
     const [actionLoading, setActionLoading] = useState(false)
+    const [pdfLoading, setPdfLoading] = useState(false)
+
+    // Dialog open states
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+    const [showEditDialog, setShowEditDialog] = useState(false)
+    const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+    const [showCancelDialog, setShowCancelDialog] = useState(false)
+    const [showPaidDialog, setShowPaidDialog] = useState(false)
+    const [customPaidDate, setCustomPaidDate] = useState('')
 
     useEffect(() => {
         fetchInvoice(invoiceId)
     }, [invoiceId, fetchInvoice])
 
     const invoice = invoices.find(i => i.id === invoiceId)
+
+    // ── Loading / error states ────────────────────────────────────────────────
 
     if (isLoading && !invoice) {
         return (
@@ -105,13 +149,26 @@ export default function InvoiceDetailPage() {
     }
 
     if (error && !invoice) {
+        const isNotFound = error === 'INVOICE_NOT_FOUND'
         return (
             <div className="text-center py-24">
-                <p className="text-red-500 mb-2">Error loading invoice</p>
-                <p className="text-sm text-slate-500">{error}</p>
-                <Button variant="outline" onClick={() => fetchInvoice(invoiceId)} className="mt-4">
-                    Retry
-                </Button>
+                <FileText className="mx-auto h-12 w-12 text-slate-300" />
+                <p className="text-red-500 mt-4 mb-1 font-medium">
+                    {isNotFound ? 'Invoice not found' : 'Error loading invoice'}
+                </p>
+                {!isNotFound && (
+                    <p className="text-sm text-slate-500 mb-4">{error}</p>
+                )}
+                <div className="flex gap-3 justify-center mt-4">
+                    {!isNotFound && (
+                        <Button variant="outline" onClick={() => fetchInvoice(invoiceId)}>
+                            Retry
+                        </Button>
+                    )}
+                    <Button variant="outline" onClick={() => router.push('/invoices')}>
+                        Back to Invoices
+                    </Button>
+                </div>
             </div>
         )
     }
@@ -128,11 +185,37 @@ export default function InvoiceDetailPage() {
         )
     }
 
+    // ── Derived values ────────────────────────────────────────────────────────
+
     const contactName = invoice.contact
         ? invoice.contact.is_company
             ? invoice.contact.company_name || '—'
             : [invoice.contact.first_name, invoice.contact.last_name].filter(Boolean).join(' ') || '—'
         : '—'
+
+    const contactAddress = invoice.contact
+        ? [
+              invoice.contact.address_line1,
+              invoice.contact.address_line2,
+              [invoice.contact.postal_code, invoice.contact.city].filter(Boolean).join(' '),
+              invoice.contact.state,
+              invoice.contact.country,
+          ].filter(Boolean).join(', ')
+        : null
+
+    const hasCompleteAddress = !!(
+        invoice.contact?.address_line1 &&
+        invoice.contact?.city &&
+        invoice.contact?.postal_code
+    )
+
+    const canEdit    = invoice.status === 'draft'
+    const canSend    = invoice.status === 'draft'
+    const canPay     = invoice.status === 'sent' || invoice.status === 'overdue'
+    const canCancel  = ['draft', 'sent', 'overdue'].includes(invoice.status)
+    const canDuplicate = true // always allowed
+
+    // ── Action handlers ───────────────────────────────────────────────────────
 
     const handleMarkAsSent = async () => {
         setActionLoading(true)
@@ -146,13 +229,35 @@ export default function InvoiceDetailPage() {
     }
 
     const handleMarkAsPaid = async () => {
+        // Open the custom date dialog
+        setCustomPaidDate(new Date().toISOString().split('T')[0])
+        setShowPaidDialog(true)
+    }
+
+    const handleConfirmPaid = async () => {
+        setShowPaidDialog(false)
         setActionLoading(true)
-        const success = await markAsPaid(invoice.id)
+        const paidAt = customPaidDate
+            ? new Date(customPaidDate).toISOString()
+            : new Date().toISOString()
+        const success = await markAsPaid(invoice.id, paidAt)
         setActionLoading(false)
         if (success) {
             toast.success('Invoice marked as paid')
         } else {
             toast.error(useInvoiceStore.getState().error ?? 'Failed to mark as paid')
+        }
+    }
+
+    const handleCancelInvoice = async () => {
+        setShowCancelDialog(false)
+        setActionLoading(true)
+        const success = await cancelInvoice(invoice.id)
+        setActionLoading(false)
+        if (success) {
+            toast.success('Invoice cancelled')
+        } else {
+            toast.error(useInvoiceStore.getState().error ?? 'Failed to cancel invoice')
         }
     }
 
@@ -181,50 +286,74 @@ export default function InvoiceDetailPage() {
         }
     }
 
-    const handleDownloadPDF = () => {
-        window.open(`/api/invoices/${invoice.id}/download`, '_blank')
+    const handleDownloadPDF = async () => {
+        // Pre-flight: check contact has address for PDF generation
+        if (!hasCompleteAddress) {
+            toast.error(
+                'Cannot generate PDF: contact is missing address (street, city, postal code). Please update the contact first.',
+                { duration: 6000 }
+            )
+            return
+        }
+
+        setPdfLoading(true)
+        try {
+            window.open(`/api/invoices/${invoice.id}/download`, '_blank')
+        } finally {
+            // Small delay so the button shows loading during the new tab open
+            setTimeout(() => setPdfLoading(false), 1500)
+        }
     }
+
+    // ── JSX ───────────────────────────────────────────────────────────────────
 
     return (
         <div className="space-y-6">
+            {/* Breadcrumb */}
+            <nav className="flex items-center gap-1 text-sm text-slate-500" aria-label="Breadcrumb">
+                <Link href="/invoices" className="hover:text-slate-700 transition-colors">
+                    Invoices
+                </Link>
+                <ChevronRight className="h-3.5 w-3.5" />
+                <span className="text-slate-800 font-medium font-mono">{invoice.invoice_number}</span>
+            </nav>
+
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push('/invoices')}
-                        className="text-slate-500 hover:text-slate-700"
-                    >
-                        <ArrowLeft className="h-4 w-4 mr-1" />
-                        Invoices
-                    </Button>
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold text-[#3D4A67] font-mono">
-                                {invoice.invoice_number}
-                            </h1>
-                            <Badge className={STATUS_COLORS[invoice.status]}>
-                                {STATUS_LABELS[invoice.status]}
-                            </Badge>
-                        </div>
-                        <p className="text-slate-500 text-sm mt-0.5">{contactName}</p>
+                <div>
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold text-[#3D4A67] font-mono">
+                            {invoice.invoice_number}
+                        </h1>
+                        <Badge className={STATUS_COLORS[invoice.status]}>
+                            {STATUS_LABELS[invoice.status]}
+                        </Badge>
                     </div>
+                    <p className="text-slate-500 text-sm mt-0.5">{contactName}</p>
                 </div>
 
                 <div className="flex items-center gap-2">
                     <Button
                         variant="outline"
                         onClick={handleDownloadPDF}
+                        disabled={pdfLoading}
                         className="border-slate-300"
                     >
-                        <FileText className="h-4 w-4 mr-2" />
+                        {pdfLoading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                            <FileText className="h-4 w-4 mr-2" />
+                        )}
                         Download PDF
                     </Button>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" disabled={actionLoading}>
+                            <Button
+                                variant="outline"
+                                disabled={actionLoading}
+                                aria-label="Invoice actions"
+                            >
                                 {actionLoading ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                 ) : (
@@ -233,14 +362,28 @@ export default function InvoiceDetailPage() {
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                            {invoice.status === 'draft' && (
+                            {canEdit && (
+                                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    Edit Invoice
+                                </DropdownMenuItem>
+                            )}
+
+                            {canDuplicate && (
+                                <DropdownMenuItem onClick={() => setShowDuplicateDialog(true)}>
+                                    <Files className="h-4 w-4 mr-2" />
+                                    Duplicate Invoice
+                                </DropdownMenuItem>
+                            )}
+
+                            {canSend && (
                                 <DropdownMenuItem onClick={handleMarkAsSent}>
                                     <Send className="h-4 w-4 mr-2" />
                                     Mark as Sent
                                 </DropdownMenuItem>
                             )}
 
-                            {(invoice.status === 'sent' || invoice.status === 'overdue') && (
+                            {canPay && (
                                 <DropdownMenuItem onClick={handleMarkAsPaid}>
                                     <CheckCircle className="h-4 w-4 mr-2" />
                                     Mark as Paid
@@ -268,6 +411,16 @@ export default function InvoiceDetailPage() {
 
                             <DropdownMenuSeparator />
 
+                            {canCancel && (
+                                <DropdownMenuItem
+                                    onClick={() => setShowCancelDialog(true)}
+                                    className="text-amber-600"
+                                >
+                                    <Ban className="h-4 w-4 mr-2" />
+                                    Cancel Invoice
+                                </DropdownMenuItem>
+                            )}
+
                             <DropdownMenuItem
                                 onClick={() => setShowDeleteDialog(true)}
                                 className="text-red-600"
@@ -293,6 +446,26 @@ export default function InvoiceDetailPage() {
                             <span className="text-slate-500">Contact</span>
                             <span className="font-medium text-[#3D4A67]">{contactName}</span>
                         </div>
+
+                        {/* Contact address */}
+                        {contactAddress ? (
+                            <div className="flex justify-between text-sm gap-4">
+                                <span className="text-slate-500 flex items-center gap-1 shrink-0">
+                                    <MapPin className="h-3 w-3" /> Address
+                                </span>
+                                <span className="text-slate-600 text-right">{contactAddress}</span>
+                            </div>
+                        ) : (
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-500 flex items-center gap-1">
+                                    <MapPin className="h-3 w-3" /> Address
+                                </span>
+                                <span className="text-amber-500 text-xs font-medium">
+                                    Missing — PDF may fail
+                                </span>
+                            </div>
+                        )}
+
                         <div className="flex justify-between text-sm">
                             <span className="text-slate-500">Invoice Type</span>
                             <span className="font-medium">
@@ -361,6 +534,11 @@ export default function InvoiceDetailPage() {
                                 ✓ Paid
                             </div>
                         )}
+                        {invoice.status === 'cancelled' && (
+                            <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded text-center text-sm text-gray-500 font-medium">
+                                Cancelled
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -376,32 +554,42 @@ export default function InvoiceDetailPage() {
                     {invoice.line_items.length === 0 ? (
                         <p className="text-slate-400 text-sm text-center py-6">No line items</p>
                     ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Description</TableHead>
-                                    <TableHead className="text-right w-20">Qty</TableHead>
-                                    <TableHead className="text-right w-32">Unit Price</TableHead>
-                                    <TableHead className="text-right w-20">Tax</TableHead>
-                                    <TableHead className="text-right w-32">Total</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {invoice.line_items.map((item) => (
-                                    <TableRow key={item.id}>
-                                        <TableCell className="font-medium">{item.description}</TableCell>
-                                        <TableCell className="text-right">{item.quantity}</TableCell>
-                                        <TableCell className="text-right">
-                                            {formatMoney(item.unit_price, invoice.currency)}
-                                        </TableCell>
-                                        <TableCell className="text-right">{item.tax_rate}%</TableCell>
-                                        <TableCell className="text-right font-medium">
-                                            {formatMoney(item.line_total, invoice.currency)}
-                                        </TableCell>
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Description</TableHead>
+                                        <TableHead className="text-right w-20">Qty</TableHead>
+                                        <TableHead className="text-right w-32">Unit Price</TableHead>
+                                        <TableHead className="text-right w-20">Tax %</TableHead>
+                                        <TableHead className="text-right w-32">Tax Amt</TableHead>
+                                        <TableHead className="text-right w-32">Total</TableHead>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                                </TableHeader>
+                                <TableBody>
+                                    {invoice.line_items.map((item) => {
+                                        const lineSubtotal = item.quantity * item.unit_price
+                                        const taxAmount = lineSubtotal * (item.tax_rate / 100)
+                                        return (
+                                            <TableRow key={item.id}>
+                                                <TableCell className="font-medium">{item.description}</TableCell>
+                                                <TableCell className="text-right">{item.quantity}</TableCell>
+                                                <TableCell className="text-right">
+                                                    {formatMoney(item.unit_price, invoice.currency)}
+                                                </TableCell>
+                                                <TableCell className="text-right">{item.tax_rate}%</TableCell>
+                                                <TableCell className="text-right text-slate-500">
+                                                    {formatMoney(taxAmount, invoice.currency)}
+                                                </TableCell>
+                                                <TableCell className="text-right font-medium">
+                                                    {formatMoney(item.line_total, invoice.currency)}
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
+                                </TableBody>
+                            </Table>
+                        </div>
                     )}
                 </CardContent>
             </Card>
@@ -419,6 +607,91 @@ export default function InvoiceDetailPage() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* ── Dialogs ─────────────────────────────────────────────────────── */}
+
+            {/* Edit Invoice */}
+            {showEditDialog && (
+                <EditInvoiceDialog
+                    invoice={invoice}
+                    open={showEditDialog}
+                    onOpenChange={setShowEditDialog}
+                />
+            )}
+
+            {/* Duplicate Invoice (CreateInvoiceDialog pre-filled, no trigger button) */}
+            {showDuplicateDialog && (
+                <CreateInvoiceDialog
+                    noTrigger
+                    defaultOpen
+                    defaultContactId={invoice.contact_id ?? undefined}
+                    defaultInvoiceType={invoice.invoice_type}
+                    defaultCurrency={invoice.currency}
+                    defaultNotes={invoice.notes ?? undefined}
+                    defaultLineItems={buildDuplicateLineItems(invoice)}
+                    onOpenChange={(open) => {
+                        if (!open) setShowDuplicateDialog(false)
+                    }}
+                />
+            )}
+
+            {/* Mark as Paid — custom date dialog */}
+            <Dialog open={showPaidDialog} onOpenChange={setShowPaidDialog}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Mark as Paid</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-3 py-2">
+                        <Label htmlFor="paid-date">Payment Date</Label>
+                        <Input
+                            id="paid-date"
+                            type="date"
+                            value={customPaidDate}
+                            onChange={e => setCustomPaidDate(e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowPaidDialog(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={handleConfirmPaid}
+                            disabled={!customPaidDate}
+                        >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            Confirm Payment
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Cancel Confirmation */}
+            <AlertDialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Cancel Invoice</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Are you sure you want to cancel invoice <strong>{invoice.invoice_number}</strong>?
+                            The invoice will be marked as cancelled but not deleted.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={actionLoading}>Back</AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={handleCancelInvoice}
+                            disabled={actionLoading}
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                            {actionLoading ? (
+                                <><Loader2 className="h-4 w-4 animate-spin mr-2 inline" />Cancelling...</>
+                            ) : (
+                                'Cancel Invoice'
+                            )}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
 
             {/* Delete Confirmation */}
             <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

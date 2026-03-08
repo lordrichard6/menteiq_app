@@ -2,123 +2,102 @@
 
 import * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import { createClient } from '@/lib/supabase/client';
 import { useInvoiceStore, LineItemInput } from '@/stores/invoice-store';
+import type { InvoiceWithLineItems } from '@/stores/invoice-store';
 import { calculateTotals } from '@/lib/invoices/totals';
 import { getTaxRatesForCountry } from '@/lib/invoices/tax-rates';
-import { FileText, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { InvoiceType } from '@/lib/types/schema';
-
-interface ContactOption {
-    id: string
-    first_name: string | null
-    last_name: string | null
-    company_name: string | null
-    is_company: boolean
-    country: string
-}
 
 interface LineItem extends LineItemInput {
     id: string; // Temporary ID for UI
 }
 
-interface CreateInvoiceDialogProps {
-    /** Pre-select a contact when the dialog opens */
-    defaultContactId?: string
-    /** Open the dialog immediately on mount */
-    defaultOpen?: boolean
-    /** Called whenever the open state changes */
-    onOpenChange?: (open: boolean) => void
-    /** Pre-fill line items (e.g. when duplicating an invoice) */
-    defaultLineItems?: LineItem[]
-    /** Pre-fill notes */
-    defaultNotes?: string
-    /** Pre-fill invoice type */
-    defaultInvoiceType?: InvoiceType
-    /** Pre-fill currency */
-    defaultCurrency?: string
-    /** If true, hide the trigger button (dialog is controlled externally) */
-    noTrigger?: boolean
+interface EditInvoiceDialogProps {
+    invoice: InvoiceWithLineItems;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
 }
 
 function generateTempId(): string {
     return `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-const DEFAULT_LINE_ITEM: () => LineItem = () => ({
-    id: generateTempId(),
-    description: '',
-    quantity: 1,
-    unit_price: 0,
-    tax_rate: 8.1, // Default Swiss VAT
-    sort_order: 0,
-});
-
-export function CreateInvoiceDialog({
-    defaultContactId,
-    defaultOpen = false,
-    onOpenChange: onOpenChangeProp,
-    defaultLineItems,
-    defaultNotes,
-    defaultInvoiceType,
-    defaultCurrency,
-    noTrigger = false,
-}: CreateInvoiceDialogProps = {}) {
-    const [open, setOpen] = React.useState(defaultOpen);
+export function EditInvoiceDialog({ invoice, open, onOpenChange }: EditInvoiceDialogProps) {
     const [loading, setLoading] = React.useState(false);
-    const [contacts, setContacts] = React.useState<ContactOption[]>([]);
     const [submitAttempted, setSubmitAttempted] = React.useState(false);
 
-    // Form state
-    const [contactId, setContactId] = React.useState(defaultContactId ?? '');
-    const [invoiceType, setInvoiceType] = React.useState<InvoiceType>(defaultInvoiceType ?? 'swiss_qr');
-    const [currency, setCurrency] = React.useState(defaultCurrency ?? 'CHF');
-    const [dueDate, setDueDate] = React.useState('');
-    const [notes, setNotes] = React.useState(defaultNotes ?? '');
-    const [lineItems, setLineItems] = React.useState<LineItem[]>(defaultLineItems ?? [DEFAULT_LINE_ITEM()]);
+    // Form state — pre-filled from invoice
+    const [invoiceType, setInvoiceType] = React.useState<InvoiceType>(invoice.invoice_type);
+    const [currency, setCurrency] = React.useState(invoice.currency);
+    const [dueDate, setDueDate] = React.useState(invoice.due_date ?? '');
+    const [notes, setNotes] = React.useState(invoice.notes ?? '');
+    const [lineItems, setLineItems] = React.useState<LineItem[]>(() =>
+        invoice.line_items.length > 0
+            ? invoice.line_items.map(item => ({
+                  id: generateTempId(),
+                  description: item.description,
+                  quantity: item.quantity,
+                  unit_price: item.unit_price,
+                  tax_rate: item.tax_rate,
+                  sort_order: item.sort_order,
+              }))
+            : [{
+                  id: generateTempId(),
+                  description: '',
+                  quantity: 1,
+                  unit_price: 0,
+                  tax_rate: 8.1,
+                  sort_order: 0,
+              }]
+    );
     const [selectedCountry, setSelectedCountry] = React.useState(
-        defaultInvoiceType === 'eu_sepa' ? 'DE' : 'CH'
+        invoice.contact?.country ?? (invoice.invoice_type === 'swiss_qr' ? 'CH' : 'DE')
     );
 
-    const { addInvoice } = useInvoiceStore();
-    const supabase = createClient();
+    const { updateInvoice } = useInvoiceStore();
 
-    const handleOpenChange = (next: boolean) => {
-        setOpen(next);
-        onOpenChangeProp?.(next);
-    };
-
-    // Load contacts when dialog opens
+    // Re-sync form when invoice changes (e.g. after a refetch)
     React.useEffect(() => {
-        const load = async () => {
-            const { data } = await supabase
-                .from('contacts')
-                .select('id, first_name, last_name, company_name, is_company, country')
-                .order('created_at', { ascending: false });
-            setContacts(data || []);
-        };
         if (open) {
-            load();
-            // Reset form (respecting any pre-fill defaults passed by the parent)
-            setContactId(defaultContactId ?? '');
-            setInvoiceType(defaultInvoiceType ?? 'swiss_qr');
-            setCurrency(defaultCurrency ?? 'CHF');
-            setDueDate('');
-            setNotes(defaultNotes ?? '');
-            setLineItems(defaultLineItems ?? [DEFAULT_LINE_ITEM()]);
-            setSelectedCountry(defaultInvoiceType === 'eu_sepa' ? 'DE' : 'CH');
+            setInvoiceType(invoice.invoice_type);
+            setCurrency(invoice.currency);
+            setDueDate(invoice.due_date ?? '');
+            setNotes(invoice.notes ?? '');
+            setLineItems(
+                invoice.line_items.length > 0
+                    ? invoice.line_items.map(item => ({
+                          id: generateTempId(),
+                          description: item.description,
+                          quantity: item.quantity,
+                          unit_price: item.unit_price,
+                          tax_rate: item.tax_rate,
+                          sort_order: item.sort_order,
+                      }))
+                    : [{
+                          id: generateTempId(),
+                          description: '',
+                          quantity: 1,
+                          unit_price: 0,
+                          tax_rate: 8.1,
+                          sort_order: 0,
+                      }]
+            );
+            setSelectedCountry(
+                invoice.contact?.country ?? (invoice.invoice_type === 'swiss_qr' ? 'CH' : 'DE')
+            );
             setSubmitAttempted(false);
         }
     }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Update currency based on invoice type
+    // Update currency when invoice type changes
     React.useEffect(() => {
         if (invoiceType === 'swiss_qr') {
             setCurrency('CHF');
@@ -136,16 +115,21 @@ export function CreateInvoiceDialog({
     const taxRates = getTaxRatesForCountry(selectedCountry);
 
     // Inline validation state
-    const isContactMissing = submitAttempted && !contactId;
     const itemErrors = lineItems.map(item => ({
         description: submitAttempted && !item.description.trim(),
-        unit_price:  submitAttempted && item.unit_price <= 0,
+        unit_price: submitAttempted && item.unit_price <= 0,
     }));
 
     // Line item handlers
     const addLineItem = () => {
-        const newItem = DEFAULT_LINE_ITEM();
-        newItem.sort_order = lineItems.length;
+        const newItem: LineItem = {
+            id: generateTempId(),
+            description: '',
+            quantity: 1,
+            unit_price: 0,
+            tax_rate: taxRates[0]?.rate ?? 8.1,
+            sort_order: lineItems.length,
+        };
         setLineItems([...lineItems, newItem]);
     };
 
@@ -164,13 +148,8 @@ export function CreateInvoiceDialog({
         }));
     };
 
-    const handleCreate = async () => {
+    const handleSave = async () => {
         setSubmitAttempted(true);
-
-        if (!contactId) {
-            toast.error('Please select a contact');
-            return;
-        }
 
         if (lineItems.some(item => !item.description.trim() || item.unit_price <= 0)) {
             toast.error('Please fill in all line items with valid descriptions and prices');
@@ -179,7 +158,6 @@ export function CreateInvoiceDialog({
 
         setLoading(true);
         try {
-            // Prepare line items (remove temp IDs)
             const preparedLineItems: LineItemInput[] = lineItems.map((item, index) => ({
                 description: item.description,
                 quantity: item.quantity,
@@ -188,24 +166,26 @@ export function CreateInvoiceDialog({
                 sort_order: index,
             }));
 
-            const invoice = await addInvoice({
-                contact_id: contactId,
-                currency,
-                invoice_type: invoiceType,
-                due_date: dueDate || null,
-                notes: notes || null,
-                line_items: preparedLineItems,
-            });
+            await updateInvoice(
+                invoice.id,
+                {
+                    currency,
+                    invoice_type: invoiceType,
+                    due_date: dueDate || null,
+                    notes: notes || null,
+                },
+                preparedLineItems
+            );
 
-            if (invoice) {
-                toast.success('Invoice created successfully');
-                window.open(`/api/invoices/${invoice.id}/download`, '_blank');
-                handleOpenChange(false);
+            const storeError = useInvoiceStore.getState().error;
+            if (storeError) {
+                toast.error(storeError);
             } else {
-                toast.error(useInvoiceStore.getState().error ?? 'Failed to create invoice');
+                toast.success('Invoice updated successfully');
+                onOpenChange(false);
             }
         } catch {
-            toast.error('Failed to create invoice');
+            toast.error('Failed to update invoice');
         } finally {
             setLoading(false);
         }
@@ -220,18 +200,12 @@ export function CreateInvoiceDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-            {!noTrigger && (
-                <DialogTrigger asChild>
-                    <Button className="bg-[#3D4A67] hover:bg-[#2D3A57] text-white">
-                        <FileText className="mr-2 h-4 w-4" />
-                        New Invoice
-                    </Button>
-                </DialogTrigger>
-            )}
+        <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle className="text-[#3D4A67]">Create Invoice</DialogTitle>
+                    <DialogTitle className="text-[#3D4A67]">
+                        Edit Invoice — {invoice.invoice_number}
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="space-y-6 py-4">
@@ -263,40 +237,15 @@ export function CreateInvoiceDialog({
                         </div>
                     </div>
 
-                    {/* Contact & Due Date */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label>Client (Bill To)</Label>
-                            <Select value={contactId} onValueChange={setContactId}>
-                                <SelectTrigger
-                                    aria-label="Select client"
-                                    className={isContactMissing ? 'border-red-400 focus:ring-red-400' : ''}
-                                >
-                                    <SelectValue placeholder="Select contact" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {contacts.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>
-                                            {c.is_company
-                                                ? c.company_name
-                                                : `${c.first_name || ''} ${c.last_name || ''}`.trim() || c.company_name
-                                            }
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {isContactMissing && (
-                                <p className="text-xs text-red-500">Please select a contact</p>
-                            )}
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Due Date</Label>
-                            <Input
-                                type="date"
-                                value={dueDate}
-                                onChange={e => setDueDate(e.target.value)}
-                            />
-                        </div>
+                    {/* Due Date */}
+                    <div className="space-y-2">
+                        <Label>Due Date</Label>
+                        <Input
+                            type="date"
+                            value={dueDate}
+                            onChange={e => setDueDate(e.target.value)}
+                            className="max-w-xs"
+                        />
                     </div>
 
                     {/* Line Items */}
@@ -321,7 +270,7 @@ export function CreateInvoiceDialog({
                                 >
                                     <CardContent className="pt-4">
                                         <div className="grid grid-cols-12 gap-3 items-end">
-                                            {/* Description - takes most space */}
+                                            {/* Description */}
                                             <div className="col-span-5 space-y-1">
                                                 {index === 0 && <Label className="text-xs text-slate-500">Description</Label>}
                                                 <Input
@@ -441,15 +390,25 @@ export function CreateInvoiceDialog({
                         />
                     </div>
 
-                    {/* Submit */}
-                    <Button
-                        className="w-full bg-[#3D4A67] hover:bg-[#2D3A57]"
-                        onClick={handleCreate}
-                        disabled={loading}
-                    >
-                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Create Invoice & Download PDF
-                    </Button>
+                    {/* Actions */}
+                    <div className="flex gap-3">
+                        <Button
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => onOpenChange(false)}
+                            disabled={loading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="flex-1 bg-[#3D4A67] hover:bg-[#2D3A57]"
+                            onClick={handleSave}
+                            disabled={loading}
+                        >
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Save Changes
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>
