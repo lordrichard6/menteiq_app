@@ -21,14 +21,10 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- =====================================================
--- 2. Enable RLS on storage.objects (idempotent)
+-- 2. Drop any existing policies (incl. broken org_id ones)
 -- =====================================================
-
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
--- =====================================================
--- 3. Drop any existing policies (incl. broken org_id ones)
--- =====================================================
+-- Note: RLS is already enabled on storage.objects in Supabase hosted env.
+-- The ALTER TABLE statement is not needed and would fail (not owner of table).
 
 -- Drop broken policies that referenced non-existent `org_id` column
 DROP POLICY IF EXISTS "Users can upload documents to their org"    ON storage.objects;
