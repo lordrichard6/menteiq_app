@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { CreateInvoiceDialog } from '@/components/modules/invoicing/create-invoice-dialog'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
     Search,
@@ -103,6 +104,7 @@ function getContactName(invoice: InvoiceWithLineItems): string {
 }
 
 export default function InvoicesPage() {
+    const router = useRouter()
     const {
         invoices,
         fetchInvoices,
@@ -333,7 +335,11 @@ export default function InvoicesPage() {
                                 </TableHeader>
                                 <TableBody>
                                     {paginatedInvoices.map((invoice) => (
-                                        <TableRow key={invoice.id}>
+                                        <TableRow
+                                            key={invoice.id}
+                                            className="cursor-pointer hover:bg-slate-50 transition-colors"
+                                            onClick={() => router.push(`/invoices/${invoice.id}`)}
+                                        >
                                             <TableCell className="font-medium font-mono">
                                                 {invoice.invoice_number}
                                             </TableCell>
@@ -353,7 +359,7 @@ export default function InvoicesPage() {
                                                     {STATUS_LABELS[invoice.status]}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-right">
+                                            <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button

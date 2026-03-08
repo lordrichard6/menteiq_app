@@ -2,8 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { generateInvoicePDF } from '@/lib/invoices/pdf-generator'
 import type { InvoiceWithLineItems } from '@/lib/services/invoice-service'
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
+    const { searchParams } = new URL(request.url)
+    const preview = searchParams.get('preview') === 'true'
     const supabase = await createClient()
 
     // Fetch invoice with full contact address for PDF generation
@@ -54,7 +56,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         return new Response(pdfBuffer as unknown as BodyInit, {
             headers: {
                 'Content-Type': 'application/pdf',
-                'Content-Disposition': `attachment; filename="${safeFilename}.pdf"`,
+                'Content-Disposition': preview
+                    ? `inline; filename="${safeFilename}.pdf"`
+                    : `attachment; filename="${safeFilename}.pdf"`,
             },
         })
     } catch (err: unknown) {

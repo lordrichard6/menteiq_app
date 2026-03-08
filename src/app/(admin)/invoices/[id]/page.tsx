@@ -57,6 +57,8 @@ import {
     Files,
     Ban,
     MapPin,
+    Eye,
+    X,
 } from 'lucide-react'
 import type { InvoiceStatus } from '@/lib/types/schema'
 import { EditInvoiceDialog } from '@/components/modules/invoicing/edit-invoice-dialog'
@@ -122,6 +124,7 @@ export default function InvoiceDetailPage() {
 
     const [actionLoading, setActionLoading] = useState(false)
     const [pdfLoading, setPdfLoading] = useState(false)
+    const [showPdfPreview, setShowPdfPreview] = useState(false)
 
     // Dialog open states
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -333,6 +336,24 @@ export default function InvoiceDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => {
+                            if (!hasCompleteAddress) {
+                                toast.error(
+                                    'Cannot preview PDF: contact is missing address (street, city, postal code). Please update the contact first.',
+                                    { duration: 6000 }
+                                )
+                                return
+                            }
+                            setShowPdfPreview(true)
+                        }}
+                        className="border-slate-300"
+                    >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview PDF
+                    </Button>
+
                     <Button
                         variant="outline"
                         onClick={handleDownloadPDF}
@@ -719,6 +740,53 @@ export default function InvoiceDetailPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* PDF Preview */}
+            {showPdfPreview && (
+                <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm">
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between px-4 py-3 bg-[#3D4A67] text-white shrink-0">
+                        <div className="flex items-center gap-3">
+                            <FileText className="h-4 w-4 opacity-70" />
+                            <span className="font-mono text-sm font-medium">{invoice.invoice_number}.pdf</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-white hover:bg-white/10"
+                                onClick={handleDownloadPDF}
+                                disabled={pdfLoading}
+                            >
+                                {pdfLoading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                                ) : (
+                                    <FileText className="h-4 w-4 mr-1.5" />
+                                )}
+                                Download
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-white hover:bg-white/10"
+                                onClick={() => setShowPdfPreview(false)}
+                            >
+                                <X className="h-4 w-4 mr-1.5" />
+                                Close
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* PDF iframe */}
+                    <div className="flex-1 bg-slate-700 overflow-hidden">
+                        <iframe
+                            src={`/api/invoices/${invoice.id}/download?preview=true`}
+                            className="w-full h-full border-0"
+                            title={`Preview ${invoice.invoice_number}`}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
