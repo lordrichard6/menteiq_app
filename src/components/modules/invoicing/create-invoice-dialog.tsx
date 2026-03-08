@@ -95,7 +95,7 @@ export function CreateInvoiceDialog({
         onOpenChangeProp?.(next);
     };
 
-    // Load contacts when dialog opens
+    // Load contacts + org defaults when dialog opens
     React.useEffect(() => {
         const load = async () => {
             const { data } = await supabase
@@ -103,10 +103,47 @@ export function CreateInvoiceDialog({
                 .select('id, first_name, last_name, company_name, is_company, country')
                 .order('created_at', { ascending: false });
             setContacts(data || []);
+
+            // Load org defaults (only if not pre-filled via props)
+            if (!defaultCurrency || !defaultInvoiceType) {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: profile } = await supabase
+                        .from('profiles')
+                        .select('tenant_id')
+                        .eq('id', user.id)
+                        .single();
+                    if (profile?.tenant_id) {
+                        const { data: org } = await supabase
+                            .from('organizations')
+                            .select('settings')
+                            .eq('id', profile.tenant_id)
+                            .single();
+                        if (org?.settings) {
+                            const settings = org.settings as Record<string, unknown>;
+                            const billing = (settings.billing as Record<string, unknown>) ?? {};
+                            const orgCurrency = billing.default_currency as string | undefined;
+                            const orgTaxRate = billing.default_tax_rate as number | undefined;
+
+                            if (!defaultCurrency && orgCurrency) {
+                                setCurrency(orgCurrency);
+                                // If org default is EUR, switch to eu_sepa
+                                if (!defaultInvoiceType && orgCurrency === 'EUR') {
+                                    setInvoiceType('eu_sepa');
+                                    setSelectedCountry('DE');
+                                }
+                            }
+                            if (orgTaxRate !== undefined) {
+                                // Apply default tax rate to all line items
+                                setLineItems(prev => prev.map(item => ({ ...item, tax_rate: orgTaxRate })));
+                            }
+                        }
+                    }
+                }
+            }
         };
         if (open) {
-            load();
-            // Reset form (respecting any pre-fill defaults passed by the parent)
+            // Reset form first (respecting any pre-fill defaults passed by the parent)
             setContactId(defaultContactId ?? '');
             setInvoiceType(defaultInvoiceType ?? 'swiss_qr');
             setCurrency(defaultCurrency ?? 'CHF');
@@ -115,6 +152,7 @@ export function CreateInvoiceDialog({
             setLineItems(defaultLineItems ?? [DEFAULT_LINE_ITEM()]);
             setSelectedCountry(defaultInvoiceType === 'eu_sepa' ? 'DE' : 'CH');
             setSubmitAttempted(false);
+            load();
         }
     }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
