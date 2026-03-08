@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Upload, File, FileText, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { type DocVisibility } from '@/lib/types/schema';
+import { toast } from 'sonner';
 
 interface UploadDialogProps {
   open: boolean;
@@ -43,7 +44,7 @@ export function UploadDialog({ open, onOpenChange, onUploadComplete, projectId, 
   const onDrop = React.useCallback((acceptedFiles: File[]) => {
     const validFiles = acceptedFiles.filter(file => {
       if (file.size > MAX_FILE_SIZE) {
-        alert(`${file.name} is too large. Maximum size is 10MB.`);
+        toast.error(`${file.name} is too large — maximum size is 10MB`);
         return false;
       }
       return true;

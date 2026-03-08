@@ -57,7 +57,7 @@ export async function GET(
     }
 
     // Get document from Supabase Storage
-    if (!document.storage_path) {
+    if (!document.file_path) {
       return NextResponse.json(
         { error: 'Document file not found' },
         { status: 404 }
@@ -66,7 +66,7 @@ export async function GET(
 
     const { data: fileData, error: downloadError } = await supabase.storage
       .from('documents')
-      .download(document.storage_path);
+      .download(document.file_path);
 
     if (downloadError || !fileData) {
       console.error('Storage download error:', downloadError);
