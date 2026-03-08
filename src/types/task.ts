@@ -10,6 +10,8 @@ export interface Task {
     status: TaskStatus
     priority: TaskPriority
     dueDate?: Date
+    /** Computed client-side: status !== 'done' && dueDate < today */
+    isOverdue?: boolean
     projectId?: string
     contactId?: string
     milestone_id?: string

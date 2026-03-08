@@ -156,7 +156,7 @@ export function AddTaskDialog({
                             </div>
                         </div>
 
-                        {/* Milestones */}
+                        {/* Milestones — filtered to this project only */}
                         <div className="grid gap-2">
                             <Label htmlFor="milestone">Project Milestone</Label>
                             <Select
@@ -169,11 +169,13 @@ export function AddTaskDialog({
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">No Milestone</SelectItem>
-                                    {milestones.map(m => (
-                                        <SelectItem key={m.id} value={m.id}>
-                                            {m.name}
-                                        </SelectItem>
-                                    ))}
+                                    {milestones
+                                        .filter(m => m.project_id === projectId)
+                                        .map(m => (
+                                            <SelectItem key={m.id} value={m.id}>
+                                                {m.name}
+                                            </SelectItem>
+                                        ))}
                                 </SelectContent>
                             </Select>
                         </div>
