@@ -12,6 +12,7 @@ interface TaskStore {
     fetchTaskById: (id: string) => Promise<void>
     addTask: (input: CreateTaskInput) => Promise<Task | null>
     updateTask: (id: string, updates: Partial<Task>) => Promise<void>
+    clearTaskField: (id: string, field: 'contact_id' | 'project_id' | 'milestone_id' | 'due_date') => Promise<void>
     deleteTask: (id: string) => Promise<boolean>
     updateStatus: (id: string, status: TaskStatus) => Promise<void>
     // Subtasks are client-side only (requires task_subtasks DB migration to persist)
@@ -25,11 +26,26 @@ function errMsg(e: unknown): string {
     return e instanceof Error ? e.message : 'Unknown error'
 }
 
-// Convert DB row to Task — computes isOverdue client-side
+// Convert DB row to Task — computes isOverdue client-side and resolves join names
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToTask(row: any): Task {
     const today = new Date().toISOString().split('T')[0]
     const status: TaskStatus = row.status || 'todo'
+
+    // Joined relations (null when no FK match or not loaded)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const contact   = row.contacts          as Record<string, any> | null | undefined
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const project   = row.projects          as Record<string, any> | null | undefined
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const milestone = row.project_milestones as Record<string, any> | null | undefined
+
+    let contactName: string | undefined
+    if (contact) {
+        contactName = contact.is_company
+            ? (contact.company_name || `${contact.first_name} ${contact.last_name}`.trim())
+            : `${contact.first_name} ${contact.last_name}`.trim()
+    }
 
     return {
         id: row.id,
@@ -40,8 +56,11 @@ function dbToTask(row: any): Task {
         dueDate: row.due_date ? new Date(row.due_date) : undefined,
         isOverdue: status !== 'done' && !!row.due_date && row.due_date < today,
         projectId: row.project_id,
+        projectName: project?.name,
         contactId: row.contact_id,
+        contactName,
         milestone_id: row.milestone_id,
+        milestoneName: milestone?.name,
         dependencies: row.task_dependencies?.map((d: { depends_on_task_id: string }) => d.depends_on_task_id) || [],
         subtasks: [], // Client-side only — persisting requires task_subtasks table
         createdAt: new Date(row.created_at),
@@ -53,7 +72,10 @@ const TASK_SELECT = `
     *,
     task_dependencies!task_id (
         depends_on_task_id
-    )
+    ),
+    contacts:contact_id (id, first_name, last_name, company_name, is_company),
+    projects:project_id (id, name),
+    project_milestones:milestone_id (id, name)
 `
 
 export const useTaskStore = create<TaskStore>()((set, get) => ({
@@ -274,6 +296,33 @@ export const useTaskStore = create<TaskStore>()((set, get) => ({
             console.error('Error deleting task:', error)
             set({ error: errMsg(error) })
             return false
+        }
+    },
+
+    clearTaskField: async (id, field) => {
+        set({ error: null })
+        try {
+            const supabase = createClient()
+            const { error } = await supabase
+                .from('tasks')
+                .update({ [field]: null, updated_at: new Date().toISOString() })
+                .eq('id', id)
+            if (error) throw error
+
+            set((state) => ({
+                tasks: state.tasks.map((t) => {
+                    if (t.id !== id) return t
+                    const patch: Partial<Task> = { updatedAt: new Date() }
+                    if (field === 'contact_id')   { patch.contactId = undefined;   patch.contactName = undefined }
+                    if (field === 'project_id')   { patch.projectId = undefined;   patch.projectName = undefined; patch.milestone_id = undefined; patch.milestoneName = undefined }
+                    if (field === 'milestone_id') { patch.milestone_id = undefined; patch.milestoneName = undefined }
+                    if (field === 'due_date')     { patch.dueDate = undefined; patch.isOverdue = false }
+                    return { ...t, ...patch }
+                }),
+            }))
+        } catch (error: unknown) {
+            console.error('Error clearing task field:', error)
+            set({ error: errMsg(error) })
         }
     },
 

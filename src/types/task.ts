@@ -13,8 +13,11 @@ export interface Task {
     /** Computed client-side: status !== 'done' && dueDate < today */
     isOverdue?: boolean
     projectId?: string
+    projectName?: string
     contactId?: string
+    contactName?: string
     milestone_id?: string
+    milestoneName?: string
     dependencies?: string[]
     subtasks: { id: string; title: string; completed: boolean }[]
     createdAt: Date
