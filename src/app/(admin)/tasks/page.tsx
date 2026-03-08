@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTaskStore } from '@/stores/task-store'
 import {
@@ -14,7 +14,7 @@ import {
     DragStartEvent,
     DragEndEvent,
 } from '@dnd-kit/core'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -51,6 +51,11 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -73,10 +78,11 @@ import {
     Download,
     Trash2,
     CheckSquare2,
-    GripVertical,
-    ExternalLink,
     ClipboardList,
-    ChevronDown,
+    MoreHorizontal,
+    Calendar,
+    Briefcase,
+    ArrowRight,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -95,6 +101,50 @@ const COLUMN_COLORS: Record<TaskStatus, string> = {
     done: '#9EAE8E',
 }
 
+const PRIORITY_BORDER_COLORS: Record<TaskPriority, string> = {
+    low: 'border-l-slate-300',
+    medium: 'border-l-blue-400',
+    high: 'border-l-amber-400',
+    urgent: 'border-l-red-500',
+}
+
+const COLUMN_BG_TINTS: Record<TaskStatus, string> = {
+    todo: 'bg-[#3D4A67]/5',
+    in_progress: 'bg-[#E9B949]/8',
+    done: 'bg-[#9EAE8E]/8',
+}
+
+const PRIORITY_DOT_COLORS: Record<TaskPriority, string> = {
+    low: 'bg-slate-400',
+    medium: 'bg-blue-500',
+    high: 'bg-amber-500',
+    urgent: 'bg-red-500',
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+function formatDueDate(dueDate: Date): { label: string; className: string } {
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const due = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())
+    const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (diffDays < 0) {
+        const abs = Math.abs(diffDays)
+        return { label: abs === 1 ? '1 day overdue' : `${abs} days overdue`, className: 'text-red-600 font-medium' }
+    }
+    if (diffDays === 0) return { label: 'Due today', className: 'text-amber-600 font-medium' }
+    if (diffDays === 1) return { label: 'Tomorrow', className: 'text-amber-500' }
+    if (diffDays <= 7) return { label: `In ${diffDays} days`, className: 'text-slate-500' }
+    return { label: due.toLocaleDateString('de-CH'), className: 'text-slate-400' }
+}
+
+function getContactInitials(name: string): string {
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    return name.slice(0, 2).toUpperCase()
+}
+
 // ─── Droppable column wrapper ─────────────────────────────────────────────────
 
 function DroppableColumn({
@@ -108,7 +158,9 @@ function DroppableColumn({
     return (
         <div
             ref={setNodeRef}
-            className={`min-h-[120px] space-y-2 rounded-md transition-colors ${isOver ? 'bg-slate-200/60' : ''}`}
+            className={`min-h-[120px] space-y-2.5 rounded-lg transition-all duration-200
+                ${isOver ? 'bg-[#E9B949]/10 ring-2 ring-[#E9B949]/30 ring-inset' : ''}
+            `}
             role="list"
             aria-label={`${TASK_STATUS_LABELS[status]} tasks`}
         >
@@ -117,7 +169,7 @@ function DroppableColumn({
     )
 }
 
-// ─── Draggable task card ──────────────────────────────────────────────────────
+// ─── Draggable task card (premium) ───────────────────────────────────────────
 
 function DraggableTaskCard({
     task,
@@ -125,27 +177,36 @@ function DraggableTaskCard({
     onSelect,
     onDelete,
     onNavigate,
+    onStatusChange,
 }: {
     task: Task
     isSelected: boolean
     onSelect: (id: string, checked: boolean) => void
     onDelete: (task: Task) => void
     onNavigate: (id: string) => void
+    onStatusChange: (id: string, status: TaskStatus) => Promise<void>
 }) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: task.id })
 
     return (
         <Card
             ref={setNodeRef}
-            style={{ opacity: isDragging ? 0.3 : 1 }}
-            className={`bg-white border shadow-sm cursor-grab active:cursor-grabbing transition-all
-                ${task.isOverdue ? 'border-red-300 bg-red-50/30' : 'border-slate-200'}
-                ${isSelected ? 'ring-2 ring-[#3D4A67]' : ''}
+            {...attributes}
+            {...listeners}
+            style={{ opacity: isDragging ? 0.4 : 1 }}
+            className={`
+                group relative bg-white border-l-4 shadow-sm cursor-pointer
+                transition-all duration-200
+                hover:shadow-md hover:-translate-y-0.5
+                ${PRIORITY_BORDER_COLORS[task.priority]}
+                ${task.isOverdue ? 'border-t border-r border-b border-red-200 bg-red-50/20' : 'border-t border-r border-b border-slate-200/80'}
+                ${isSelected ? 'ring-2 ring-[#3D4A67] ring-offset-1' : ''}
             `}
             role="listitem"
+            onClick={() => onNavigate(task.id)}
         >
-            <CardContent className="p-3">
-                <div className="flex items-start gap-2">
+            <CardContent className="p-3.5">
+                <div className="flex items-start gap-2.5">
                     {/* Bulk-select checkbox */}
                     <Checkbox
                         checked={isSelected}
@@ -153,67 +214,120 @@ function DraggableTaskCard({
                         aria-label={`Select task: ${task.title}`}
                         className="mt-0.5 shrink-0"
                         onClick={(e) => e.stopPropagation()}
+                        onPointerDown={(e) => e.stopPropagation()}
                     />
-
-                    {/* Drag handle */}
-                    <button
-                        {...attributes}
-                        {...listeners}
-                        className="mt-0.5 shrink-0 text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing"
-                        aria-label="Drag to reorder"
-                    >
-                        <GripVertical className="h-4 w-4" />
-                    </button>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
+                        {/* Title + priority pill */}
                         <div className="flex items-start justify-between gap-2">
-                            <button
-                                className="font-medium text-slate-900 text-left hover:text-[#3D4A67] hover:underline text-sm"
-                                onClick={() => onNavigate(task.id)}
-                            >
+                            <p className="font-medium text-slate-900 text-sm leading-snug line-clamp-2">
                                 {task.title}
-                            </button>
-                            <Badge className={`${TASK_PRIORITY_COLORS[task.priority]} shrink-0 text-xs`}>
+                            </p>
+                            <span className={`
+                                inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5
+                                text-[10px] font-semibold uppercase tracking-wide
+                                ${TASK_PRIORITY_COLORS[task.priority]}
+                            `}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT_COLORS[task.priority]}`} />
                                 {TASK_PRIORITY_LABELS[task.priority]}
-                            </Badge>
+                            </span>
                         </div>
 
-                        {task.isOverdue && (
-                            <div className="flex items-center gap-1 mt-1 text-xs text-red-600 font-medium">
-                                <AlertCircle className="h-3 w-3" />
-                                Overdue
-                            </div>
-                        )}
-
-                        {task.dueDate && !task.isOverdue && (
-                            <p className="text-xs text-slate-400 mt-1">
-                                Due: {task.dueDate.toLocaleDateString('de-CH')}
+                        {/* Description preview */}
+                        {task.description && (
+                            <p className="text-xs text-slate-400 mt-1 line-clamp-1">
+                                {task.description}
                             </p>
                         )}
 
-                        <div className="flex items-center gap-1 mt-2">
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 px-2 text-xs text-slate-500 hover:text-[#3D4A67]"
-                                onClick={() => onNavigate(task.id)}
-                                aria-label={`Open task: ${task.title}`}
-                            >
-                                <ExternalLink className="h-3 w-3 mr-1" />
-                                Open
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 px-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 ml-auto"
-                                onClick={() => onDelete(task)}
-                                aria-label={`Delete task: ${task.title}`}
-                            >
-                                <X className="h-3 w-3" />
-                            </Button>
-                        </div>
+                        {/* Context row: contact, project, due date */}
+                        {(task.contactName || task.projectName || task.dueDate) && (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5">
+                                {/* Contact initials + name */}
+                                {task.contactName && (
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#3D4A67]/10 text-[9px] font-bold text-[#3D4A67]">
+                                            {getContactInitials(task.contactName)}
+                                        </span>
+                                        <span className="text-xs text-slate-500 truncate max-w-[100px]">
+                                            {task.contactName}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Project */}
+                                {task.projectName && (
+                                    <div className="flex items-center gap-1">
+                                        <Briefcase className="h-3 w-3 text-slate-400" />
+                                        <span className="text-xs text-slate-500 truncate max-w-[100px]">
+                                            {task.projectName}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Due date (relative) */}
+                                {task.dueDate && (() => {
+                                    const { label, className } = formatDueDate(task.dueDate)
+                                    return (
+                                        <div className="flex items-center gap-1">
+                                            <Calendar className="h-3 w-3 text-slate-400" />
+                                            <span className={`text-xs ${className}`}>{label}</span>
+                                        </div>
+                                    )
+                                })()}
+                            </div>
+                        )}
                     </div>
+
+                    {/* Three-dot menu */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                className="h-7 w-7 p-0 shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-slate-400 hover:text-slate-600"
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                aria-label={`Actions for: ${task.title}`}
+                            >
+                                <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger className="cursor-pointer">
+                                    <ArrowRight className="h-4 w-4 mr-2" />
+                                    Move to
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    {(Object.keys(TASK_STATUS_LABELS) as TaskStatus[])
+                                        .filter((s) => s !== task.status)
+                                        .map((s) => (
+                                            <DropdownMenuItem
+                                                key={s}
+                                                onClick={(e) => { e.stopPropagation(); onStatusChange(task.id, s) }}
+                                                className="cursor-pointer"
+                                            >
+                                                <div
+                                                    className="w-2.5 h-2.5 rounded-full mr-2 shrink-0"
+                                                    style={{ backgroundColor: COLUMN_COLORS[s] }}
+                                                />
+                                                {TASK_STATUS_LABELS[s]}
+                                            </DropdownMenuItem>
+                                        ))}
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                                onClick={(e) => { e.stopPropagation(); onDelete(task) }}
+                                className="text-red-600 focus:text-red-600 cursor-pointer"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </CardContent>
         </Card>
@@ -224,16 +338,84 @@ function DraggableTaskCard({
 
 function TaskGhostCard({ task }: { task: Task }) {
     return (
-        <Card className={`bg-white shadow-xl border-2 ${task.isOverdue ? 'border-red-400' : 'border-[#3D4A67]'} rotate-2`}>
-            <CardContent className="p-3">
+        <Card className={`
+            bg-white shadow-2xl border-l-4 rotate-2 scale-105
+            ${PRIORITY_BORDER_COLORS[task.priority]}
+            ${task.isOverdue ? 'border-t border-r border-b border-red-400' : 'border-t border-r border-b border-[#3D4A67]'}
+        `}>
+            <CardContent className="p-3.5">
                 <div className="flex items-center justify-between gap-2">
                     <p className="font-medium text-slate-900 text-sm truncate">{task.title}</p>
-                    <Badge className={`${TASK_PRIORITY_COLORS[task.priority]} shrink-0 text-xs`}>
+                    <span className={`
+                        inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5
+                        text-[10px] font-semibold uppercase tracking-wide
+                        ${TASK_PRIORITY_COLORS[task.priority]}
+                    `}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${PRIORITY_DOT_COLORS[task.priority]}`} />
                         {TASK_PRIORITY_LABELS[task.priority]}
-                    </Badge>
+                    </span>
                 </div>
             </CardContent>
         </Card>
+    )
+}
+
+// ─── Task actions three-dot menu (shared by list view) ───────────────────────
+
+function TaskActionsMenu({
+    task,
+    onDelete,
+    onStatusChange,
+}: {
+    task: Task
+    onDelete: (task: Task) => void
+    onStatusChange: (id: string, status: TaskStatus) => void
+}) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600"
+                    aria-label={`Actions for: ${task.title}`}
+                >
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="cursor-pointer">
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Move to
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        {(Object.keys(TASK_STATUS_LABELS) as TaskStatus[])
+                            .filter((s) => s !== task.status)
+                            .map((s) => (
+                                <DropdownMenuItem
+                                    key={s}
+                                    onClick={() => onStatusChange(task.id, s)}
+                                    className="cursor-pointer"
+                                >
+                                    <div
+                                        className="w-2.5 h-2.5 rounded-full mr-2 shrink-0"
+                                        style={{ backgroundColor: COLUMN_COLORS[s] }}
+                                    />
+                                    {TASK_STATUS_LABELS[s]}
+                                </DropdownMenuItem>
+                            ))}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onClick={() => onDelete(task)}
+                    className="text-red-600 focus:text-red-600 cursor-pointer"
+                >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
     )
 }
 
@@ -268,7 +450,7 @@ export default function TasksPage() {
 
     // ── DND ───────────────────────────────────────────────────────────────────
     const [activeTask, setActiveTask] = useState<Task | null>(null)
-    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+    const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
     // Keyboard shortcut: N = new task (when not in an input)
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -441,12 +623,12 @@ export default function TasksPage() {
             {/* Header */}
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold text-[#3D4A67]">Tasks</h1>
-                    <p className="text-slate-600 text-sm mt-0.5">
-                        {tasks.length} total
+                    <h1 className="text-2xl font-bold text-[#3D4A67] tracking-tight">Tasks</h1>
+                    <p className="text-slate-500 text-sm mt-0.5">
+                        {tasks.length} task{tasks.length !== 1 ? 's' : ''}
                         {overdueCount > 0 && (
-                            <span className="ml-2 text-red-600 font-medium">
-                                · {overdueCount} overdue
+                            <span className="ml-2 text-red-500 font-medium">
+                                ({overdueCount} overdue)
                             </span>
                         )}
                     </p>
@@ -703,49 +885,73 @@ export default function TasksPage() {
                 </Card>
 
             ) : view === 'kanban' ? (
-                /* ── Kanban view ──────────────────────────────────────────────── */
+                /* ── Kanban view (premium) ──────────────────────────────────── */
                 <DndContext
                     sensors={sensors}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
-                    {/* Responsive: overflow-x-auto on mobile, 3-col grid on md+ */}
                     <div className="overflow-x-auto pb-2">
-                        <div className="grid gap-4 md:grid-cols-3 min-w-[720px]">
+                        <div className="grid gap-5 md:grid-cols-3 min-w-[720px]">
                             {(Object.keys(TASK_STATUS_LABELS) as TaskStatus[]).map((status) => {
                                 const col = tasksByStatus[status]
                                 return (
-                                    <Card key={status} className="border-slate-200 bg-slate-50">
-                                        <CardHeader className="pb-2">
-                                            <div className="flex items-center gap-2">
+                                    <div key={status} className="flex flex-col min-w-[240px]">
+                                        {/* Column header */}
+                                        <div className={`flex items-center justify-between px-4 py-3 rounded-t-xl ${COLUMN_BG_TINTS[status]}`}>
+                                            <div className="flex items-center gap-2.5">
                                                 <div
-                                                    className="w-3 h-3 rounded-full"
+                                                    className="w-3 h-3 rounded-full ring-2 ring-white/80"
                                                     style={{ backgroundColor: COLUMN_COLORS[status] }}
                                                     aria-hidden="true"
                                                 />
-                                                <CardTitle className="text-base text-slate-700">
+                                                <h3 className="font-semibold text-[#3D4A67] text-sm tracking-tight">
                                                     {TASK_STATUS_LABELS[status]}
-                                                </CardTitle>
+                                                </h3>
                                             </div>
-                                            <CardDescription>
-                                                {col.length} task{col.length !== 1 ? 's' : ''}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
+                                            <span className="text-lg font-bold text-[#3D4A67]/40">
+                                                {col.length}
+                                            </span>
+                                        </div>
+
+                                        {/* Column body */}
+                                        <div className="bg-slate-50/50 rounded-b-xl border border-t-0 border-slate-200/60 p-3 flex-1">
                                             <DroppableColumn status={status}>
-                                                {col.map((task) => (
-                                                    <DraggableTaskCard
-                                                        key={task.id}
-                                                        task={task}
-                                                        isSelected={selected.has(task.id)}
-                                                        onSelect={handleSelect}
-                                                        onDelete={setDeleteTarget}
-                                                        onNavigate={(id) => router.push(`/tasks/${id}`)}
-                                                    />
-                                                ))}
+                                                {col.length === 0 ? (
+                                                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                                                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+                                                            <ClipboardList className="h-6 w-6 text-slate-300" />
+                                                        </div>
+                                                        <p className="text-sm text-slate-400">
+                                                            No {TASK_STATUS_LABELS[status].toLowerCase()} tasks
+                                                        </p>
+                                                        {status === 'todo' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                className="mt-2 text-xs text-[#E9B949] hover:text-[#C99929]"
+                                                                onClick={() => setNewOpen(true)}
+                                                            >
+                                                                <Plus className="h-3.5 w-3.5 mr-1" />Add a task
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                ) : (
+                                                    col.map((task) => (
+                                                        <DraggableTaskCard
+                                                            key={task.id}
+                                                            task={task}
+                                                            isSelected={selected.has(task.id)}
+                                                            onSelect={handleSelect}
+                                                            onDelete={setDeleteTarget}
+                                                            onNavigate={(id) => router.push(`/tasks/${id}`)}
+                                                            onStatusChange={updateStatus}
+                                                        />
+                                                    ))
+                                                )}
                                             </DroppableColumn>
-                                        </CardContent>
-                                    </Card>
+                                        </div>
+                                    </div>
                                 )
                             })}
                         </div>
@@ -814,15 +1020,11 @@ export default function TasksPage() {
                                 <Badge className="text-xs bg-slate-100 text-slate-600">
                                     {TASK_STATUS_LABELS[task.status]}
                                 </Badge>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 text-red-500 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => setDeleteTarget(task)}
-                                    aria-label={`Delete task: ${task.title}`}
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </Button>
+                                <TaskActionsMenu
+                                    task={task}
+                                    onDelete={setDeleteTarget}
+                                    onStatusChange={updateStatus}
+                                />
                             </div>
                         ))}
                     </CardContent>
