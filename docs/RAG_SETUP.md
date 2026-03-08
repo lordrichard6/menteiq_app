@@ -17,50 +17,52 @@ The document upload feature requires a Supabase Storage bucket named `documents`
 
 ### Set up RLS policies:
 
-Run the following SQL in your Supabase SQL Editor:
+> **Note:** As of migration `20260308000000_storage_bucket_setup.sql`, the bucket creation and RLS policies are applied automatically. Manual setup is only needed if you're not running migrations.
+
+Run the following SQL in your Supabase SQL Editor (if applying manually):
 
 ```sql
 -- Enable RLS on storage.objects
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
--- Policy: Users can upload documents to their organization's folder
-CREATE POLICY "Users can upload documents to their org"
+-- Policy: Users can upload documents to their tenant's folder
+CREATE POLICY "Users can upload documents to their tenant"
 ON storage.objects
 FOR INSERT
 TO authenticated
 WITH CHECK (
   bucket_id = 'documents'
   AND (storage.foldername(name))[1] IN (
-    SELECT org_id::text
-    FROM profiles
+    SELECT tenant_id::text
+    FROM public.profiles
     WHERE id = auth.uid()
   )
 );
 
--- Policy: Users can read documents from their organization
-CREATE POLICY "Users can read their org's documents"
+-- Policy: Users can read documents from their tenant
+CREATE POLICY "Users can read their tenant's documents"
 ON storage.objects
 FOR SELECT
 TO authenticated
 USING (
   bucket_id = 'documents'
   AND (storage.foldername(name))[1] IN (
-    SELECT org_id::text
-    FROM profiles
+    SELECT tenant_id::text
+    FROM public.profiles
     WHERE id = auth.uid()
   )
 );
 
--- Policy: Users can delete documents from their organization
-CREATE POLICY "Users can delete their org's documents"
+-- Policy: Users can delete documents from their tenant
+CREATE POLICY "Users can delete their tenant's documents"
 ON storage.objects
 FOR DELETE
 TO authenticated
 USING (
   bucket_id = 'documents'
   AND (storage.foldername(name))[1] IN (
-    SELECT org_id::text
-    FROM profiles
+    SELECT tenant_id::text
+    FROM public.profiles
     WHERE id = auth.uid()
   )
 );
@@ -145,14 +147,17 @@ Returns processing status and chunk count.
 ### "Failed to upload file to storage"
 
 **Possible causes:**
-1. Storage bucket doesn't exist
-2. RLS policies not set up correctly
-3. User's org_id is null
+1. Storage bucket `documents` doesn't exist — run migration `20260308000000_storage_bucket_setup.sql`
+2. RLS policies not applied or reference wrong column (`org_id` instead of `tenant_id`)
+3. User's `tenant_id` is null in profiles
 
 **Solution:**
 ```sql
--- Check user's org_id
-SELECT id, org_id FROM profiles WHERE id = auth.uid();
+-- Check user's tenant_id
+SELECT id, tenant_id FROM public.profiles WHERE id = auth.uid();
+
+-- Check the bucket exists
+SELECT * FROM storage.buckets WHERE id = 'documents';
 
 -- Check storage policies
 SELECT * FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage';
@@ -160,13 +165,13 @@ SELECT * FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage'
 
 ### "No organization found"
 
-**Cause:** User profile doesn't have an org_id
+**Cause:** User profile doesn't have a `tenant_id`
 
 **Solution:**
 ```sql
 -- Assign user to an organization
-UPDATE profiles
-SET org_id = (SELECT id FROM organizations LIMIT 1)
+UPDATE public.profiles
+SET tenant_id = (SELECT id FROM public.organizations LIMIT 1)
 WHERE id = auth.uid();
 ```
 
@@ -186,13 +191,13 @@ USING (bucket_id = 'documents');
 
 ```
 /documents (bucket)
-  /{org_id}/
+  /{tenant_id}/
     /1707686400000-abc123-document.pdf
     /1707686500000-def456-report.docx
     /...
 ```
 
-Files are organized by organization to ensure multi-tenancy isolation.
+Files are organized by tenant to ensure multi-tenancy isolation.
 
 ## 6. Security Considerations
 
