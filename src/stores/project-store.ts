@@ -37,8 +37,8 @@ function dbToProject(row: Record<string, unknown>): Project {
     return {
         id: row.id as string,
         name: row.name as string,
-        description: row.description as string | null,
-        clientId: row.contact_id as string | null,
+        description: (row.description as string | null) ?? undefined,
+        clientId: (row.contact_id as string | null) ?? undefined,
         clientName: (contacts?.company_name as string | undefined) ||
             [contacts?.first_name, contacts?.last_name].filter(Boolean).join(' '),
         status: row.status as ProjectStatus,

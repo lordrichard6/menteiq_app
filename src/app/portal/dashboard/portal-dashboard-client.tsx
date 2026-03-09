@@ -37,6 +37,9 @@ interface PortalProject {
   name: string;
   status: string;
   description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  progress?: number | null;
 }
 
 interface PortalDashboardClientProps {
@@ -140,7 +143,7 @@ export function PortalDashboardClient({
   };
 
   // Calculate stats
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.amount_total || 0), 0);
   const activeProjects = projects.filter((p) => p.status === 'active').length;
 
   return (
@@ -251,12 +254,12 @@ export function PortalDashboardClient({
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           <Clock className="h-3 w-3" />
-                          {format(new Date(invoice.created_at), 'dd MMM yyyy')}
+                          {format(new Date(invoice.invoice_date), 'dd MMM yyyy')}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 ml-4">
                         <span className="text-sm font-semibold text-slate-900">
-                          CHF {invoice.total?.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
+                          CHF {invoice.amount_total?.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
                         </span>
                         <Button
                           size="sm"

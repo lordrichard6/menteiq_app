@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'customer.subscription.updated': {
-        const sub = event.data.object as {
+        const sub = event.data.object as unknown as {
           id: string;
           status: string;
           current_period_end: number;

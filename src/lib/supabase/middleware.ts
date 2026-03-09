@@ -77,6 +77,12 @@ export async function updateSession(request: NextRequest) {
         if (role === 'member' && !path.startsWith('/portal')) {
             return NextResponse.redirect(new URL('/portal/dashboard', request.url))
         }
+
+        // 4. Protect /admin routes — platform_admin only
+        // Owners and members cannot access the platform super-admin section
+        if (path.startsWith('/admin') && role !== 'platform_admin') {
+            return NextResponse.redirect(new URL('/dashboard', request.url))
+        }
     }
 
     return supabaseResponse

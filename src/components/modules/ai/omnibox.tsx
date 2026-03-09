@@ -4,14 +4,18 @@ import * as React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { Bot, User, Send, Sparkles } from 'lucide-react';
-import { useChat, type Message } from '@ai-sdk/react';
+import { Send, Sparkles } from 'lucide-react';
+import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 
 export function Omnibox() {
-    const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-        api: '/api/chat',
+    // AI SDK v3: manage input locally, use sendMessage()
+    const [input, setInput] = React.useState('');
+    const { messages, sendMessage, status } = useChat({
+        transport: new DefaultChatTransport({ api: '/api/chat' }),
     });
 
+    const isLoading = status === 'streaming' || status === 'submitted';
     const scrollRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
@@ -19,6 +23,14 @@ export function Omnibox() {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages]);
+
+    const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const text = input.trim();
+        if (!text || isLoading) return;
+        setInput('');
+        sendMessage({ text });
+    };
 
     return (
         <Card className="fixed bottom-4 right-4 w-[400px] h-[500px] shadow-2xl flex flex-col z-50 border-slate-200 dark:border-slate-800">
@@ -35,16 +47,27 @@ export function Omnibox() {
                     </div>
                 )}
                 <div className="space-y-4">
-                    {messages.map((m: Message) => (
-                        <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[85%] rounded-lg p-3 text-sm ${m.role === 'user'
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
-                                }`}>
-                                {m.content}
+                    {messages.map((m) => {
+                        const text = m.parts
+                            .filter((p) => p.type === 'text')
+                            .map((p) => (p as { type: 'text'; text: string }).text)
+                            .join('');
+                        return (
+                            <div
+                                key={m.id}
+                                className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                                <div
+                                    className={`max-w-[85%] rounded-lg p-3 text-sm ${m.role === 'user'
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200'
+                                        }`}
+                                >
+                                    {text}
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                     {isLoading && (
                         <div className="flex justify-start">
                             <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3 text-sm text-slate-500 animate-pulse">
@@ -58,11 +81,11 @@ export function Omnibox() {
             <form onSubmit={handleSubmit} className="p-3 border-t flex gap-2">
                 <Input
                     value={input}
-                    onChange={handleInputChange}
-                    placeholder="Ask Orbit..."
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Ask Mente AI..."
                     className="flex-1"
                 />
-                <Button type="submit" size="icon" disabled={isLoading}>
+                <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
                     <Send className="w-4 h-4" />
                 </Button>
             </form>

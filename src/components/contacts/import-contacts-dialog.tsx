@@ -117,7 +117,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
             const headers = results.meta.fields || []
             setParsedData({
               headers,
-              rows: results.data,
+              rows: results.data as Record<string, unknown>[],
               fileName: file.name,
               fileType: 'csv'
             })
@@ -429,7 +429,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                           </Select>
                         </TableCell>
                         <TableCell className="text-sm text-gray-500 italic max-w-0 truncate">
-                          {parsedData.rows[0]?.[header] || '(empty)'}
+                          {String(parsedData.rows[0]?.[header] ?? '(empty)')}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -493,7 +493,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                       <TableRow key={i}>
                         {MENTEIQ_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
                           <TableCell key={`${i}-${field.value}`} className="whitespace-nowrap">
-                            {row[field.value] || '-'}
+                            {String(row[field.value] ?? '-')}
                           </TableCell>
                         ))}
                       </TableRow>

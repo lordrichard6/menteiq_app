@@ -220,7 +220,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                             router.push(`/contacts/${contact.id}`)
                             onOpenChange(false)
                         },
-                        category: 'search',
+                        category: 'search' as const,
                     }))
                 )
             }
@@ -244,7 +244,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                             router.push(`/projects/${project.id}`)
                             onOpenChange(false)
                         },
-                        category: 'search',
+                        category: 'search' as const,
                     }))
                 )
             }

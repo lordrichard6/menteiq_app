@@ -20,7 +20,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Menu, LayoutDashboard, Users, FolderKanban, CheckSquare,
   MessageSquare, FileText, Receipt, Settings, LogOut,
-  Activity, HelpCircle, PanelLeft, PanelLeftClose,
+  Activity, HelpCircle, PanelLeft, PanelLeftClose, ShieldCheck,
 } from 'lucide-react';
 import * as React from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -171,6 +171,7 @@ export function AdminSidebar() {
   const [pinned, setPinned] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
   const [user, setUser] = React.useState<{ name?: string; email?: string } | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = React.useState(false);
 
   // Restore pinned state from localStorage on mount
   React.useEffect(() => {
@@ -179,7 +180,7 @@ export function AdminSidebar() {
     }
   }, []);
 
-  // Fetch authenticated user
+  // Fetch authenticated user and role
   React.useEffect(() => {
     const fetchUser = async () => {
       const supabase = createClient();
@@ -189,6 +190,13 @@ export function AdminSidebar() {
           name: authUser.user_metadata?.full_name || authUser.user_metadata?.name,
           email: authUser.email,
         });
+        // Check if platform admin
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', authUser.id)
+          .single();
+        setIsPlatformAdmin(profile?.role === 'platform_admin');
       }
     };
     fetchUser();
@@ -307,6 +315,24 @@ export function AdminSidebar() {
           {/* Bottom section */}
           <div className="mt-auto mb-4 px-3 space-y-0.5 shrink-0">
 
+            {/* Platform Admin link — only visible to platform_admin */}
+            {isPlatformAdmin && (
+              <Link
+                href="/admin"
+                aria-label="Platform Admin"
+                aria-current={isActive('/admin') ? 'page' : undefined}
+                className={cn(
+                  "flex items-center gap-4 rounded-lg px-3 py-2.5 transition-colors text-sm",
+                  isActive('/admin')
+                    ? "bg-emerald-500/20 text-emerald-300 font-medium"
+                    : "text-emerald-400/80 hover:bg-emerald-500/10 hover:text-emerald-300"
+                )}
+              >
+                <ShieldCheck className="h-5 w-5 min-w-[20px]" aria-hidden="true" />
+                <span className={textVisible(pinned)}>Platform Admin</span>
+              </Link>
+            )}
+
             {/* Settings */}
             <Link
               href="/settings"
@@ -404,6 +430,22 @@ export function AdminSidebar() {
                   <HelpCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
                   Help &amp; Support
                 </a>
+                {isPlatformAdmin && (
+                  <Link
+                    href="/admin"
+                    onClick={closeMobile}
+                    aria-current={isActive('/admin') ? 'page' : undefined}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors text-sm",
+                      isActive('/admin')
+                        ? "bg-emerald-500/20 text-emerald-300 font-medium"
+                        : "text-emerald-400/80 hover:bg-emerald-500/10 hover:text-emerald-300"
+                    )}
+                  >
+                    <ShieldCheck className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    Platform Admin
+                  </Link>
+                )}
 
                 {/* Mobile logout */}
                 <AlertDialog>
