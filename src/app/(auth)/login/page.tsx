@@ -10,7 +10,7 @@ import { login, signInWithGoogle } from "../actions"
 import { useActionState } from "react"
 
 export default function LoginPage() {
-    const [state, formAction, isPending] = useActionState(async (_prev: any, formData: FormData) => {
+    const [state, formAction, isPending] = useActionState(async (_prev: unknown, formData: FormData) => {
         const res = await login(formData);
         if (res?.error) return { error: res.error };
         return null;

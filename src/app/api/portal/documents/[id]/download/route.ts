@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase/server';
 import { getPortalSession } from '@/lib/portal/session';
 
@@ -69,7 +70,7 @@ export async function GET(
       .download(document.file_path);
 
     if (downloadError || !fileData) {
-      console.error('Storage download error:', downloadError);
+      Sentry.captureException(downloadError, { extra: { documentId, filePath: document.file_path } });
       return NextResponse.json(
         { error: 'Failed to download document' },
         { status: 500 }
@@ -91,7 +92,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Portal document download error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Failed to download document' },
       { status: 500 }

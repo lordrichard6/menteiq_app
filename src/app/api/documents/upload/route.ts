@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase/server';
 import { type DocVisibility } from '@/lib/types/schema';
 
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (storageError) {
-      console.error('Storage upload error:', storageError);
+      Sentry.captureException(storageError, { extra: { storagePath, tenantId: profile.tenant_id } });
       return NextResponse.json(
         { error: `Failed to upload file to storage: ${storageError.message}` },
         { status: 500 }
@@ -105,7 +106,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (dbError) {
-      console.error('Database insert error:', dbError);
+      Sentry.captureException(dbError, { extra: { storagePath, tenantId: profile.tenant_id } });
 
       // Cleanup: delete uploaded file if DB insert fails
       await supabase.storage.from('documents').remove([storagePath]);
@@ -127,7 +128,7 @@ export async function POST(request: NextRequest) {
       path: document.file_path,
     });
   } catch (error) {
-    console.error('Upload error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

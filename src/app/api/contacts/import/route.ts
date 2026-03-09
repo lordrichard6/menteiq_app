@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import { validateContacts, ImportContactInput } from '@/lib/validation/contact-import'
 
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
       .select()
 
     if (insertError) {
-      console.error('Insert error:', insertError)
+      Sentry.captureException(insertError, { extra: { tenantId: profile.tenant_id, count: contactsToInsert.length } })
       return NextResponse.json(
         {
           error: 'Failed to import contacts',
@@ -138,8 +139,8 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error: unknown) {
+    Sentry.captureException(error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Import error:', error)
     return NextResponse.json(
       {
         error: 'Internal server error',
@@ -201,7 +202,7 @@ export async function GET(request: NextRequest) {
     })
 
   } catch (error: unknown) {
-    console.error('Duplicate check error:', error)
+    Sentry.captureException(error)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

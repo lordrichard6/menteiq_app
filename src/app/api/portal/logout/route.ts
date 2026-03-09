@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { cookies } from 'next/headers';
 
 export async function POST() {
@@ -13,7 +14,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Portal logout error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Failed to logout' },
       { status: 500 }

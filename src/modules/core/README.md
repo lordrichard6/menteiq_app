@@ -1,6 +1,6 @@
 # Core Modules
 
-Core modules are always enabled for all tenants. They provide the base functionality of OrbitCRM.
+Core modules are always enabled for all tenants. They provide the base functionality of MenteIQ.
 
 ## Modules
 

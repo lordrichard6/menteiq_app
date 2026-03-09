@@ -25,7 +25,7 @@ export interface Notification {
     entityUrl?: string
     read: boolean
     archived: boolean
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
     createdAt: Date
     readAt?: Date
 }
@@ -46,6 +46,7 @@ interface NotificationStore {
 }
 
 // Convert DB row to Notification
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToNotification(row: any): Notification {
     return {
         id: row.id,
@@ -93,9 +94,9 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
             const unreadCount = notifications.filter((n) => !n.read).length
 
             set({ notifications, unreadCount, isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching notifications:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
         }
     },
 
@@ -117,9 +118,9 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
                 ),
                 unreadCount: Math.max(0, state.unreadCount - 1),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error marking notification as read:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -146,9 +147,9 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
                 })),
                 unreadCount: 0,
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error marking all notifications as read:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -170,9 +171,9 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
                     ? state.unreadCount
                     : Math.max(0, state.unreadCount - 1),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error archiving notification:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -192,9 +193,9 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
             if (error) throw error
 
             set({ notifications: [], unreadCount: 0 })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error clearing notifications:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -214,7 +215,7 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
             if (error) throw error
 
             set({ unreadCount: count || 0 })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error getting unread count:', error)
         }
     },

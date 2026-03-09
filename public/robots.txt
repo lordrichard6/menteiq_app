@@ -15,4 +15,4 @@ Disallow: /activity
 Disallow: /portal
 Disallow: /api/
 
-Sitemap: https://app.orbitcrm.com/sitemap.xml
+Sitemap: https://app.menteiq.ch/sitemap.xml

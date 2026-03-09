@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 
 export async function POST(req: Request) {
@@ -183,10 +184,10 @@ export async function POST(req: Request) {
             summary: deletionSummary,
             note: 'Your account will be fully removed within 24 hours. You have been logged out.',
         })
-    } catch (error: any) {
-        console.error('GDPR deletion error:', error)
+    } catch (error: unknown) {
+        Sentry.captureException(error)
         return NextResponse.json(
-            { error: error.message || 'Failed to delete account' },
+            { error: error instanceof Error ? error.message : 'Failed to delete account' },
             { status: 500 }
         )
     }
@@ -298,10 +299,10 @@ export async function GET(req: Request) {
         }
 
         return NextResponse.json(preview)
-    } catch (error: any) {
-        console.error('GDPR deletion preview error:', error)
+    } catch (error: unknown) {
+        Sentry.captureException(error)
         return NextResponse.json(
-            { error: error.message || 'Failed to preview deletion' },
+            { error: error instanceof Error ? error.message : 'Failed to preview deletion' },
             { status: 500 }
         )
     }

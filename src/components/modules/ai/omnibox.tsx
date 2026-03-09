@@ -5,12 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Bot, User, Send, Sparkles } from 'lucide-react';
-import { useChat } from '@ai-sdk/react';
+import { useChat, type Message } from '@ai-sdk/react';
 
 export function Omnibox() {
     const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
         api: '/api/chat',
-    } as any) as any;
+    });
 
     const scrollRef = React.useRef<HTMLDivElement>(null);
 
@@ -31,11 +31,11 @@ export function Omnibox() {
                 {messages.length === 0 && (
                     <div className="text-center text-slate-400 text-sm mt-20">
                         <p>How can I help you today?</p>
-                        <p className="text-xs mt-2">Example: "Find documents about Taxes"</p>
+                        <p className="text-xs mt-2">Example: &quot;Find documents about Taxes&quot;</p>
                     </div>
                 )}
                 <div className="space-y-4">
-                    {messages.map((m: any) => (
+                    {messages.map((m: Message) => (
                         <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                             <div className={`max-w-[85%] rounded-lg p-3 text-sm ${m.role === 'user'
                                 ? 'bg-blue-600 text-white'

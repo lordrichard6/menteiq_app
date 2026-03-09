@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { sendEmail } from '@/lib/email/resend-client'
 import {
   confirmSignupEmail,
@@ -45,16 +46,22 @@ interface SupabaseEmailHookPayload {
 async function verifySignature(req: NextRequest, rawBody: string): Promise<boolean> {
   const secret = process.env.SEND_EMAIL_HOOK_SECRET
   if (!secret) {
-    console.warn('[send-email hook] SEND_EMAIL_HOOK_SECRET not set — skipping signature check')
+    Sentry.addBreadcrumb({
+      category: 'auth',
+      message: '[send-email hook] SEND_EMAIL_HOOK_SECRET not set — skipping signature check',
+      level: 'warning',
+    })
     return true
   }
 
   const authHeader = req.headers.get('authorization') ?? ''
 
   if (!authHeader.startsWith('v1,')) {
-    console.error('[send-email hook] Unexpected Authorization header format:', authHeader.slice(0, 60))
-    // Still allow through — Supabase may vary format. Signature is defence-in-depth.
-    return true
+    Sentry.captureMessage('[send-email hook] Unexpected Authorization header format', {
+      level: 'error',
+      extra: { headerPrefix: authHeader.slice(0, 60) },
+    })
+    return false
   }
 
   const receivedHex = authHeader.slice(3) // strip "v1,"
@@ -76,8 +83,10 @@ async function verifySignature(req: NextRequest, rawBody: string): Promise<boole
     .join('')
 
   if (expectedHex !== receivedHex) {
-    console.error('[send-email hook] HMAC mismatch — allowing through for now')
-    return true // TODO: enforce once signature format is confirmed stable
+    Sentry.captureMessage('[send-email hook] HMAC mismatch — rejecting request', {
+      level: 'error',
+    })
+    return false
   }
 
   return true
@@ -151,7 +160,10 @@ export async function POST(req: NextRequest) {
         html = emailChangeEmail(actionUrl, user.email, firstName)
         break
       default:
-        console.error('[send-email hook] Unknown action type:', email_action_type)
+        Sentry.captureMessage('[send-email hook] Unknown action type', {
+          level: 'error',
+          extra: { email_action_type },
+        })
         // Return 200 so Supabase doesn't retry — we just won't send an email
         return NextResponse.json({}, { status: 200 })
     }
@@ -159,7 +171,10 @@ export async function POST(req: NextRequest) {
     const result = await sendEmail({ to, subject, html })
 
     if (!result.success) {
-      console.error('[send-email hook] Resend failed:', result.error)
+      Sentry.captureMessage('[send-email hook] Resend failed', {
+        level: 'error',
+        extra: { error: result.error },
+      })
       // Return 200 to prevent Supabase from blocking signup — email failure is non-fatal
       return NextResponse.json({}, { status: 200 })
     }
@@ -168,7 +183,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({}, { status: 200 })
 
   } catch (err) {
-    console.error('[send-email hook] Unexpected error:', err)
+    Sentry.captureException(err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

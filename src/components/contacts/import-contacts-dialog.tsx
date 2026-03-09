@@ -27,7 +27,7 @@ interface ParsedData {
 }
 
 // MenteIQ field definitions
-const ORBITCRM_FIELDS = [
+const MENTEIQ_FIELDS = [
   { value: 'firstName', label: 'First Name', required: true },
   { value: 'lastName', label: 'Last Name', required: false },
   { value: 'fullName', label: 'Full Name (auto-split)', required: false },
@@ -418,7 +418,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {ORBITCRM_FIELDS.map((field) => (
+                              {MENTEIQ_FIELDS.map((field) => (
                                 <SelectItem key={field.value} value={field.value}>
                                   <div className="flex items-center gap-2">
                                     {field.label} {field.required && <Badge variant="destructive" className="ml-1 text-xs">Required</Badge>}
@@ -481,7 +481,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                 <Table className="w-full" style={{ minWidth: '800px' }}>
                   <TableHeader>
                     <TableRow>
-                      {ORBITCRM_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
+                      {MENTEIQ_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
                         <TableHead key={field.value} className="whitespace-nowrap font-semibold">
                           {field.label}
                         </TableHead>
@@ -491,7 +491,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                   <TableBody>
                     {previewData.map((row, i) => (
                       <TableRow key={i}>
-                        {ORBITCRM_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
+                        {MENTEIQ_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
                           <TableCell key={`${i}-${field.value}`} className="whitespace-nowrap">
                             {row[field.value] || '-'}
                           </TableCell>

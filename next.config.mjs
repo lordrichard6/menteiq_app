@@ -1,36 +1,29 @@
+import { withSentryConfig } from '@sentry/nextjs'
 
 /** @type {import('next').NextConfig} */
+
+// Security headers — enforced CSP (was report-only). unsafe-eval stripped in production.
+// Source of truth: projects/shared/security-headers.ts — mirrored here for .mjs compatibility.
+const isDev = process.env.NODE_ENV === 'development';
+
 const securityHeaders = [
+  { key: 'X-Frame-Options', value: 'SAMEORIGIN' },          // allows portal iframes same-domain
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  { key: 'X-DNS-Prefetch-Control', value: 'on' },
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
   {
-    key: 'X-Frame-Options',
-    value: 'SAMEORIGIN', // SAMEORIGIN allows embedding within same domain (e.g. portal iframes)
-  },
-  {
-    key: 'X-Content-Type-Options',
-    value: 'nosniff',
-  },
-  {
-    key: 'Referrer-Policy',
-    value: 'strict-origin-when-cross-origin',
-  },
-  {
-    key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
-  },
-  {
-    key: 'X-DNS-Prefetch-Control',
-    value: 'on',
-  },
-  {
-    // Start with report-only CSP — switch to Content-Security-Policy once confirmed
-    key: 'Content-Security-Policy-Report-Only',
+    key: 'Content-Security-Policy',   // promoted from report-only
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-eval needed for React dev tools
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      // unsafe-eval only in dev (Next.js HMR); removed in production builds
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://fonts.googleapis.com`,
+      "style-src 'self' 'unsafe-inline'",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.resend.com https://api.stripe.com",
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.resend.com https://api.stripe.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io",
+      "frame-src https://js.stripe.com",   // Stripe Checkout + Elements
       "frame-ancestors 'self'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -59,4 +52,19 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // Sentry organisation + project (set in env or here)
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT ?? 'menteiq',
+
+  // Suppress Sentry build output
+  silent: !process.env.CI,
+
+  // Upload source maps in production builds only
+  sourcemaps: {
+    disable: process.env.NODE_ENV !== 'production',
+  },
+
+  // Disable Sentry SDK tree-shaking opt-in features we don't use
+  disableLogger: true,
+});

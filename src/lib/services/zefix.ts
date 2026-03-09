@@ -36,6 +36,7 @@ export const ZefixService = {
 
             const data = await response.json();
 
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return data.list.map((item: any) => ({
                 name: item.name,
                 uid: item.uid,

@@ -6,6 +6,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(req: Request) {
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
         const tenantId = profile.tenant_id
 
         // Collect all user data
-        const exportData: any = {
+        const exportData: Record<string, unknown> = {
             exportDate: new Date().toISOString(),
             user: {
                 id: user.id,
@@ -134,7 +135,7 @@ export async function GET(req: Request) {
         }
 
         // Create filename with timestamp
-        const filename = `orbit-crm-data-export-${user.id.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.json`
+        const filename = `menteiq-data-export-${user.id.slice(0, 8)}-${new Date().toISOString().split('T')[0]}.json`
 
         // Return as downloadable JSON
         return new NextResponse(JSON.stringify(exportData, null, 2), {
@@ -145,10 +146,10 @@ export async function GET(req: Request) {
                 'X-Export-Format': 'JSON',
             },
         })
-    } catch (error: any) {
-        console.error('GDPR export error:', error)
+    } catch (error: unknown) {
+        Sentry.captureException(error)
         return NextResponse.json(
-            { error: error.message || 'Failed to export data' },
+            { error: error instanceof Error ? error.message : 'Failed to export data' },
             { status: 500 }
         )
     }

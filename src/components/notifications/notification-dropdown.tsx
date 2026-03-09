@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useNotificationStore } from '@/stores/notification-store'
+import { useNotificationStore, type Notification } from '@/stores/notification-store'
 import { formatRelativeTime } from '@/lib/format-time'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -83,7 +83,7 @@ export function NotificationDropdown() {
         return () => clearInterval(interval)
     }, [fetchNotifications])
 
-    const handleNotificationClick = async (notification: any) => {
+    const handleNotificationClick = async (notification: Notification) => {
         // Mark as read
         if (!notification.read) {
             await markAsRead(notification.id)
@@ -161,7 +161,7 @@ export function NotificationDropdown() {
                                 <div className="p-8 text-center text-slate-500">
                                     <Bell className="h-12 w-12 mx-auto mb-3 opacity-30" />
                                     <p className="text-sm font-medium mb-1">No notifications</p>
-                                    <p className="text-xs">You're all caught up!</p>
+                                    <p className="text-xs">You&apos;re all caught up!</p>
                                 </div>
                             ) : (
                                 <div className="divide-y divide-slate-100">

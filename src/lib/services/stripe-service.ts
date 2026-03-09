@@ -12,9 +12,10 @@
  */
 
 import type { Invoice } from '@/lib/types/schema';
+import type Stripe from 'stripe';
 
 // Lazy import Stripe to avoid errors if not installed
-let stripe: any = null;
+let stripe: Stripe | null = null;
 
 async function getStripe() {
   if (!stripe) {
@@ -135,7 +136,7 @@ export const StripeService = {
   async verifyWebhookSignature(
     payload: string | Buffer,
     signature: string
-  ): Promise<any> {
+  ): Promise<Stripe.Event> {
     const stripeClient = await getStripe();
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -153,7 +154,7 @@ export const StripeService = {
   /**
    * Retrieve a checkout session
    */
-  async getCheckoutSession(sessionId: string): Promise<any> {
+  async getCheckoutSession(sessionId: string): Promise<Stripe.Response<Stripe.Checkout.Session>> {
     const stripeClient = await getStripe();
     return stripeClient.checkout.sessions.retrieve(sessionId);
   },

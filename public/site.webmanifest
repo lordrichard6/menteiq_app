@@ -1,0 +1,32 @@
+{
+  "name": "MenteIQ",
+  "short_name": "MenteIQ",
+  "description": "Swiss-made AI Business OS for service professionals",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#3D4A67",
+  "theme_color": "#3D4A67",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "16x16 32x32",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/menteiq_logo_white.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

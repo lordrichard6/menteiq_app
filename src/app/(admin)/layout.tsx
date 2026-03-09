@@ -10,7 +10,7 @@ export default function DashboardLayout({
             <AdminSidebar />
 
             {/* Main content - Adjusted for mobile header (pt-16) and desktop sidebar (md:pl-64) */}
-            <main className="md:pl-28 min-h-screen pt-16 md:pt-0 p-8 transition-all duration-300">
+            <main id="main-content" className="md:pl-28 min-h-screen pt-16 md:pt-0 p-8 transition-all duration-300">
                 {children}
             </main>
         </div>

@@ -36,9 +36,9 @@ export const useTimeStore = create<TimeStore>()((set, get) => ({
 
             if (error) throw error
             set({ timeEntries: data as TimeEntry[], isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching time entries:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
         }
     },
 
@@ -80,9 +80,9 @@ export const useTimeStore = create<TimeStore>()((set, get) => ({
                 timeEntries: [newEntry, ...state.timeEntries]
             }))
             return newEntry
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error adding time entry:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
             return null
         }
     },
@@ -100,9 +100,9 @@ export const useTimeStore = create<TimeStore>()((set, get) => ({
             set((state) => ({
                 timeEntries: state.timeEntries.filter((e) => e.id !== id)
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error deleting time entry:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     }
 }))

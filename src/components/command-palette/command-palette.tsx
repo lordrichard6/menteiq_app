@@ -41,7 +41,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     const [query, setQuery] = useState('')
     const [selectedIndex, setSelectedIndex] = useState(0)
     const [isSearching, setIsSearching] = useState(false)
-    const [searchResults, setSearchResults] = useState<any[]>([])
+    const [searchResults, setSearchResults] = useState<Command[]>([])
     const router = useRouter()
 
     // Static commands (navigation & actions)
@@ -182,22 +182,6 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         },
     ]
 
-    // Search for entities when query changes
-    useEffect(() => {
-        if (query.trim().length < 2) {
-            setSearchResults([])
-            return
-        }
-
-        const timeout = setTimeout(async () => {
-            setIsSearching(true)
-            await performSearch(query)
-            setIsSearching(false)
-        }, 300)
-
-        return () => clearTimeout(timeout)
-    }, [query])
-
     const performSearch = async (searchQuery: string) => {
         try {
             const supabase = createClient()
@@ -212,7 +196,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
             if (!profile?.tenant_id) return
 
-            const results: any[] = []
+            const results: Command[] = []
 
             // Search contacts
             const { data: contacts } = await supabase
@@ -270,6 +254,23 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             console.error('Command palette search error:', error)
         }
     }
+
+    // Search for entities when query changes
+    useEffect(() => {
+        if (query.trim().length < 2) {
+            setSearchResults([])
+            return
+        }
+
+        const timeout = setTimeout(async () => {
+            setIsSearching(true)
+            await performSearch(query)
+            setIsSearching(false)
+        }, 300)
+
+        return () => clearTimeout(timeout)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [query])
 
     // Filter static commands based on query
     const filteredCommands = staticCommands.filter(
