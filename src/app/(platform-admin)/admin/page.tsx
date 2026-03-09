@@ -15,6 +15,7 @@ import {
     RefreshCw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TIER_COLORS, formatAdminDate } from '@/lib/admin-utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,12 +38,6 @@ interface AdminStats {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const TIER_COLORS: Record<string, string> = {
-    free: 'bg-slate-100 text-slate-600',
-    pro: 'bg-blue-100 text-blue-700',
-    business: 'bg-purple-100 text-purple-700',
-}
-
 function formatNumber(n: number): string {
     return new Intl.NumberFormat('en-US').format(n)
 }
@@ -54,14 +49,6 @@ function formatCurrency(n: number): string {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     }).format(n)
-}
-
-function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-    })
 }
 
 function formatTokens(n: number): string {
@@ -113,7 +100,7 @@ export default function PlatformAdminPage() {
     const [stats, setStats] = React.useState<AdminStats | null>(null)
     const [loading, setLoading] = React.useState(true)
     const [error, setError] = React.useState<string | null>(null)
-    const [lastRefreshed, setLastRefreshed] = React.useState<Date>(new Date())
+    const [lastRefreshed, setLastRefreshed] = React.useState<Date | null>(null)
 
     const fetchStats = React.useCallback(async () => {
         setLoading(true)
@@ -133,6 +120,9 @@ export default function PlatformAdminPage() {
 
     React.useEffect(() => {
         fetchStats()
+        // Auto-refresh every 60 seconds
+        const interval = setInterval(fetchStats, 60_000)
+        return () => clearInterval(interval)
     }, [fetchStats])
 
     const statCards = stats
@@ -191,7 +181,9 @@ export default function PlatformAdminPage() {
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900">Platform Overview</h1>
                     <p className="text-sm text-slate-500 mt-0.5">
-                        Last refreshed: {lastRefreshed.toLocaleTimeString('en-GB')}
+                        {lastRefreshed
+                            ? `Last refreshed: ${lastRefreshed.toLocaleTimeString('en-GB')} · auto-refreshes every 60s`
+                            : 'Loading…'}
                     </p>
                 </div>
                 <button
@@ -298,7 +290,7 @@ export default function PlatformAdminPage() {
                                                 <p className="text-sm font-medium text-slate-900 truncate">
                                                     {org.name}
                                                 </p>
-                                                <p className="text-xs text-slate-400">{formatDate(org.created_at)}</p>
+                                                <p className="text-xs text-slate-400">{formatAdminDate(org.created_at)}</p>
                                             </div>
                                             <Badge
                                                 variant="secondary"

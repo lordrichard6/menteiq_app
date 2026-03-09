@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         const from = (page - 1) * pageSize
         const to = from + pageSize - 1
 
-        // 3. Service role queries
+        // 3. Service role client
         if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
             return NextResponse.json({ error: 'Service role key not configured' }, { status: 500 })
         }
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
             { auth: { autoRefreshToken: false, persistSession: false } }
         )
 
-        // Build org query
+        // 4. Main org query
         let orgsQuery = supabaseAdmin
             .from('organizations')
             .select('id, name, slug, subscription_tier, stripe_customer_id, token_balance, current_period_end, created_at', { count: 'exact' })
@@ -68,29 +68,36 @@ export async function GET(request: NextRequest) {
         }
 
         const { data: orgs, count, error } = await orgsQuery
-
         if (error) throw error
 
-        // 4. Enrich each org with user and invoice counts
-        const enriched = await Promise.all(
-            (orgs ?? []).map(async (org) => {
-                const [usersResult, invoicesResult] = await Promise.all([
-                    supabaseAdmin
-                        .from('profiles')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('tenant_id', org.id),
-                    supabaseAdmin
-                        .from('invoices')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('tenant_id', org.id),
-                ])
-                return {
-                    ...org,
-                    userCount: usersResult.count ?? 0,
-                    invoiceCount: invoicesResult.count ?? 0,
-                }
-            })
-        )
+        // 5. Batch-enrich with user and invoice counts (2 queries instead of N*2)
+        const orgIds = (orgs ?? []).map((o) => o.id)
+
+        const [userCountsResult, invoiceCountsResult] = orgIds.length > 0
+            ? await Promise.all([
+                supabaseAdmin.from('profiles').select('tenant_id').in('tenant_id', orgIds),
+                supabaseAdmin.from('invoices').select('tenant_id').in('tenant_id', orgIds),
+            ])
+            : [{ data: [] as Array<{ tenant_id: string }> }, { data: [] as Array<{ tenant_id: string }> }]
+
+        // Build count maps
+        const userCountMap = new Map<string, number>()
+        for (const row of userCountsResult.data ?? []) {
+            const id = row.tenant_id
+            userCountMap.set(id, (userCountMap.get(id) ?? 0) + 1)
+        }
+
+        const invoiceCountMap = new Map<string, number>()
+        for (const row of invoiceCountsResult.data ?? []) {
+            const id = row.tenant_id
+            invoiceCountMap.set(id, (invoiceCountMap.get(id) ?? 0) + 1)
+        }
+
+        const enriched = (orgs ?? []).map((org) => ({
+            ...org,
+            userCount: userCountMap.get(org.id) ?? 0,
+            invoiceCount: invoiceCountMap.get(org.id) ?? 0,
+        }))
 
         return NextResponse.json({
             organizations: enriched,

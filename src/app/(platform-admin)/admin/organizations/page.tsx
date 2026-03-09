@@ -4,6 +4,8 @@ import * as React from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
     Search,
     Building2,
@@ -13,8 +15,19 @@ import {
     ChevronLeft,
     ChevronRight,
     RefreshCw,
+    Loader2,
+    CircleDot,
+    CircleOff,
+    Circle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+    TIER_COLORS,
+    formatAdminDate,
+    getSubscriptionStatus,
+    STATUS_COLORS,
+    STATUS_LABELS,
+} from '@/lib/admin-utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,26 +52,189 @@ interface OrgsResponse {
     totalPages: number
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const TIER_COLORS: Record<string, string> = {
-    free: 'bg-slate-100 text-slate-600',
-    pro: 'bg-blue-100 text-blue-700',
-    business: 'bg-purple-100 text-purple-700',
-}
-
-function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric',
-    })
-}
-
 const TIER_OPTIONS = [
     { value: '', label: 'All Tiers' },
     { value: 'free', label: 'Free' },
     { value: 'pro', label: 'Pro' },
     { value: 'business', label: 'Business' },
 ]
+
+const STATUS_ICONS: Record<string, React.ReactNode> = {
+    free: <Circle className="h-3 w-3" />,
+    active: <CircleDot className="h-3 w-3" />,
+    expired: <CircleOff className="h-3 w-3" />,
+}
+
+// ─── Org Detail Sheet ─────────────────────────────────────────────────────────
+
+interface OrgDetailSheetProps {
+    org: OrgRow | null
+    onClose: () => void
+    onUpdated: (updatedPage: number) => void
+    currentPage: number
+}
+
+function OrgDetailSheet({ org, onClose, onUpdated, currentPage }: OrgDetailSheetProps) {
+    const [newTier, setNewTier] = React.useState('')
+    const [tokenAmount, setTokenAmount] = React.useState('')
+    const [actionLoading, setActionLoading] = React.useState<'tier' | 'tokens' | null>(null)
+    const [actionError, setActionError] = React.useState<string | null>(null)
+    const [actionSuccess, setActionSuccess] = React.useState<string | null>(null)
+
+    // Reset form when org changes
+    React.useEffect(() => {
+        if (org) {
+            setNewTier(org.subscription_tier)
+            setTokenAmount('')
+            setActionError(null)
+            setActionSuccess(null)
+        }
+    }, [org?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const doAction = async (action: 'tier' | 'tokens') => {
+        if (!org) return
+        setActionLoading(action)
+        setActionError(null)
+        setActionSuccess(null)
+        try {
+            const body = action === 'tier'
+                ? { action: 'update_tier', tier: newTier }
+                : { action: 'add_tokens', amount: parseInt(tokenAmount) }
+
+            const res = await fetch(`/api/admin/organizations/${org.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            })
+            const json = await res.json() as { success?: boolean; error?: string }
+            if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+
+            setActionSuccess(action === 'tier' ? 'Tier updated' : `${parseInt(tokenAmount).toLocaleString()} tokens added`)
+            if (action === 'tokens') setTokenAmount('')
+            onUpdated(currentPage)
+        } catch (e) {
+            setActionError(e instanceof Error ? e.message : 'Action failed')
+        } finally {
+            setActionLoading(null)
+        }
+    }
+
+    const status = org ? getSubscriptionStatus(org.subscription_tier, org.current_period_end) : 'free'
+
+    return (
+        <Sheet open={org !== null} onOpenChange={(open) => { if (!open) onClose() }}>
+            <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                {org && (
+                    <>
+                        <div className="pb-4">
+                            <h2 className="flex items-center gap-2 flex-wrap text-lg font-semibold text-slate-900">
+                                <Building2 className="h-5 w-5 text-slate-500 shrink-0" />
+                                <span className="truncate">{org.name}</span>
+                                <Badge variant="secondary" className={cn('capitalize shrink-0', TIER_COLORS[org.subscription_tier])}>
+                                    {org.subscription_tier}
+                                </Badge>
+                            </h2>
+                            <p className="font-mono text-xs text-slate-500 mt-1">{org.slug}</p>
+                        </div>
+
+                        {/* ── Details grid ── */}
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 mb-1">Status</p>
+                                <p className={cn('text-sm font-medium flex items-center gap-1.5', STATUS_COLORS[status])}>
+                                    {STATUS_ICONS[status]}
+                                    {STATUS_LABELS[status]}
+                                </p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 mb-1">Period ends</p>
+                                <p className="text-sm font-medium text-slate-700">{formatAdminDate(org.current_period_end)}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 mb-1">Users</p>
+                                <p className="text-sm font-medium text-slate-700">{org.userCount}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 mb-1">Invoices</p>
+                                <p className="text-sm font-medium text-slate-700">{org.invoiceCount}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 mb-1">Token balance</p>
+                                <p className="text-sm font-medium text-slate-700">{(org.token_balance ?? 0).toLocaleString()}</p>
+                            </div>
+                            <div className="bg-slate-50 rounded-lg p-3">
+                                <p className="text-xs text-slate-500 mb-1">Joined</p>
+                                <p className="text-sm font-medium text-slate-700">{formatAdminDate(org.created_at)}</p>
+                            </div>
+                        </div>
+
+                        {/* ── Feedback ── */}
+                        {actionError && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                {actionError}
+                            </div>
+                        )}
+                        {actionSuccess && (
+                            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
+                                ✓ {actionSuccess}
+                            </div>
+                        )}
+
+                        {/* ── Change Tier ── */}
+                        <div className="border border-slate-200 rounded-xl p-4 mb-4">
+                            <p className="text-sm font-semibold text-slate-900 mb-3">Change Tier</p>
+                            <div className="flex gap-2">
+                                <select
+                                    value={newTier}
+                                    onChange={(e) => setNewTier(e.target.value)}
+                                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                >
+                                    <option value="free">Free</option>
+                                    <option value="pro">Pro ($29/mo)</option>
+                                    <option value="business">Business ($99/mo)</option>
+                                </select>
+                                <Button
+                                    size="sm"
+                                    onClick={() => doAction('tier')}
+                                    disabled={actionLoading !== null || newTier === org.subscription_tier}
+                                >
+                                    {actionLoading === 'tier' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update'}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* ── Add Tokens ── */}
+                        <div className="border border-slate-200 rounded-xl p-4">
+                            <p className="text-sm font-semibold text-slate-900 mb-1">Add Tokens</p>
+                            <p className="text-xs text-slate-500 mb-3">
+                                Grant additional AI tokens. Current balance: {(org.token_balance ?? 0).toLocaleString()}
+                            </p>
+                            <div className="flex gap-2">
+                                <Input
+                                    type="number"
+                                    placeholder="e.g. 50000"
+                                    value={tokenAmount}
+                                    onChange={(e) => setTokenAmount(e.target.value)}
+                                    min={1}
+                                    max={10000000}
+                                    className="flex-1"
+                                />
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => doAction('tokens')}
+                                    disabled={actionLoading !== null || !tokenAmount || parseInt(tokenAmount) <= 0}
+                                >
+                                    {actionLoading === 'tokens' ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </SheetContent>
+        </Sheet>
+    )
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -69,13 +245,16 @@ export default function AdminOrganizationsPage() {
     const [search, setSearch] = React.useState('')
     const [tier, setTier] = React.useState('')
     const [page, setPage] = React.useState(1)
+    const [isSearching, setIsSearching] = React.useState(false)
+    const [selectedOrg, setSelectedOrg] = React.useState<OrgRow | null>(null)
 
-    const fetchOrgs = React.useCallback(async () => {
+    // fetchOrgs takes targetPage explicitly — avoids double-fetch race condition
+    const fetchOrgs = React.useCallback(async (targetPage: number) => {
         setLoading(true)
         setError(null)
         try {
             const params = new URLSearchParams({
-                page: String(page),
+                page: String(targetPage),
                 pageSize: '20',
                 ...(search && { search }),
                 ...(tier && { tier }),
@@ -88,22 +267,24 @@ export default function AdminOrganizationsPage() {
         } finally {
             setLoading(false)
         }
-    }, [page, search, tier])
+    }, [search, tier]) // page NOT in deps — passed as argument
 
-    // Debounced search
+    // Search/tier change: debounced 300ms, resets to page 1
     React.useEffect(() => {
+        setIsSearching(true)
         const t = setTimeout(() => {
+            setIsSearching(false)
             setPage(1)
-            fetchOrgs()
+            fetchOrgs(1)
         }, 300)
-        return () => clearTimeout(t)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, tier])
+        return () => { clearTimeout(t); setIsSearching(false) }
+    }, [search, tier, fetchOrgs])
 
-    React.useEffect(() => {
-        fetchOrgs()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page])
+    // Pagination: called directly from buttons (no extra effect needed)
+    const goToPage = (next: number) => {
+        setPage(next)
+        fetchOrgs(next)
+    }
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -116,7 +297,7 @@ export default function AdminOrganizationsPage() {
                     </p>
                 </div>
                 <button
-                    onClick={fetchOrgs}
+                    onClick={() => fetchOrgs(page)}
                     disabled={loading}
                     className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
                 >
@@ -128,9 +309,13 @@ export default function AdminOrganizationsPage() {
             <Card>
                 <CardHeader className="pb-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        {/* Search */}
+                        {/* Search with loading indicator */}
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            {isSearching ? (
+                                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 animate-spin" />
+                            ) : (
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            )}
                             <Input
                                 placeholder="Search by name or slug…"
                                 value={search}
@@ -163,6 +348,7 @@ export default function AdminOrganizationsPage() {
                                 <tr className="border-b border-slate-100 bg-slate-50">
                                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Organization</th>
                                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Tier</th>
+                                    <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
                                     <th className="text-right px-4 py-3 font-semibold text-slate-600">
                                         <span className="flex items-center justify-end gap-1">
                                             <Users className="h-3.5 w-3.5" /> Users
@@ -175,7 +361,7 @@ export default function AdminOrganizationsPage() {
                                     </th>
                                     <th className="text-right px-4 py-3 font-semibold text-slate-600">
                                         <span className="flex items-center justify-end gap-1">
-                                            <Zap className="h-3.5 w-3.5" /> Tokens
+                                            <Zap className="h-3.5 w-3.5" /> Token Balance
                                         </span>
                                     </th>
                                     <th className="text-right px-4 py-3 font-semibold text-slate-600">Joined</th>
@@ -185,7 +371,7 @@ export default function AdminOrganizationsPage() {
                                 {loading ? (
                                     Array.from({ length: 8 }).map((_, i) => (
                                         <tr key={i} className="border-b border-slate-50 animate-pulse">
-                                            {Array.from({ length: 6 }).map((__, j) => (
+                                            {Array.from({ length: 7 }).map((__, j) => (
                                                 <td key={j} className="px-4 py-3">
                                                     <div className="h-4 bg-slate-200 rounded w-full" />
                                                 </td>
@@ -194,66 +380,76 @@ export default function AdminOrganizationsPage() {
                                     ))
                                 ) : data?.organizations.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-12 text-center text-slate-400">
+                                        <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
                                             <Building2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
                                             <p>No organizations found</p>
                                         </td>
                                     </tr>
                                 ) : (
-                                    data?.organizations.map((org) => (
-                                        <tr
-                                            key={org.id}
-                                            className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
-                                        >
-                                            <td className="px-4 py-3">
-                                                <div>
-                                                    <p className="font-medium text-slate-900">{org.name}</p>
-                                                    <p className="text-xs text-slate-400">{org.slug}</p>
-                                                </div>
-                                            </td>
-                                            <td className="px-4 py-3">
-                                                <Badge
-                                                    variant="secondary"
-                                                    className={cn('capitalize', TIER_COLORS[org.subscription_tier])}
-                                                >
-                                                    {org.subscription_tier}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                                                {org.userCount}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                                                {org.invoiceCount}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-700 font-medium">
-                                                {(org.token_balance ?? 0).toLocaleString()}
-                                            </td>
-                                            <td className="px-4 py-3 text-right text-slate-500 text-xs">
-                                                {formatDate(org.created_at)}
-                                            </td>
-                                        </tr>
-                                    ))
+                                    data?.organizations.map((org) => {
+                                        const status = getSubscriptionStatus(org.subscription_tier, org.current_period_end)
+                                        return (
+                                            <tr
+                                                key={org.id}
+                                                onClick={() => setSelectedOrg(org)}
+                                                className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                                            >
+                                                <td className="px-4 py-3">
+                                                    <div>
+                                                        <p className="font-medium text-slate-900">{org.name}</p>
+                                                        <p className="text-xs text-slate-400">{org.slug}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className={cn('capitalize', TIER_COLORS[org.subscription_tier])}
+                                                    >
+                                                        {org.subscription_tier}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <span className={cn('flex items-center gap-1 text-xs font-medium', STATUS_COLORS[status])}>
+                                                        {STATUS_ICONS[status]}
+                                                        {STATUS_LABELS[status]}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-700 font-medium">
+                                                    {org.userCount}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-700 font-medium">
+                                                    {org.invoiceCount}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-700 font-medium">
+                                                    {(org.token_balance ?? 0).toLocaleString()}
+                                                </td>
+                                                <td className="px-4 py-3 text-right text-slate-500 text-xs">
+                                                    {formatAdminDate(org.created_at)}
+                                                </td>
+                                            </tr>
+                                        )
+                                    })
                                 )}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Pagination */}
-                    {data && data.totalPages > 1 && (
+                    {/* Pagination — always visible when there's data */}
+                    {data && data.total > 0 && (
                         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
                             <span className="text-xs text-slate-500">
-                                Page {data.page} of {data.totalPages} · {data.total} results
+                                Page {data.page} of {Math.max(1, data.totalPages)} · {data.total} results
                             </span>
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    onClick={() => goToPage(Math.max(1, page - 1))}
                                     disabled={page <= 1}
                                     className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </button>
                                 <button
-                                    onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                                    onClick={() => goToPage(Math.min(data.totalPages, page + 1))}
                                     disabled={page >= data.totalPages}
                                     className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
@@ -264,6 +460,14 @@ export default function AdminOrganizationsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Org detail sheet */}
+            <OrgDetailSheet
+                org={selectedOrg}
+                onClose={() => setSelectedOrg(null)}
+                onUpdated={fetchOrgs}
+                currentPage={page}
+            />
         </div>
     )
 }

@@ -4,7 +4,9 @@ import * as React from 'react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import {
     Search,
     Users,
@@ -14,8 +16,10 @@ import {
     ShieldCheck,
     Crown,
     User,
+    Loader2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { TIER_TEXT_COLORS, formatAdminDate } from '@/lib/admin-utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,17 +64,12 @@ const ROLE_CONFIG: Record<string, { label: string; cls: string; icon: React.Reac
     },
 }
 
-const TIER_COLORS: Record<string, string> = {
-    free: 'text-slate-400',
-    pro: 'text-blue-600',
-    business: 'text-purple-600',
-}
-
-function formatDate(iso: string): string {
-    return new Date(iso).toLocaleDateString('en-GB', {
-        day: '2-digit', month: 'short', year: 'numeric',
-    })
-}
+const ROLE_OPTIONS = [
+    { value: '', label: 'All Roles' },
+    { value: 'owner', label: 'Owners' },
+    { value: 'member', label: 'Members' },
+    { value: 'platform_admin', label: 'Platform Admins' },
+]
 
 function getInitials(name: string | null, email: string | null): string {
     if (name?.trim()) {
@@ -79,12 +78,146 @@ function getInitials(name: string | null, email: string | null): string {
     return (email?.[0] ?? '?').toUpperCase()
 }
 
-const ROLE_OPTIONS = [
-    { value: '', label: 'All Roles' },
-    { value: 'owner', label: 'Owners' },
-    { value: 'member', label: 'Members' },
-    { value: 'platform_admin', label: 'Platform Admins' },
-]
+// ─── User Detail Sheet ────────────────────────────────────────────────────────
+
+interface UserDetailSheetProps {
+    user: UserRow | null
+    onClose: () => void
+    onUpdated: (targetPage: number) => void
+    currentPage: number
+}
+
+function UserDetailSheet({ user, onClose, onUpdated, currentPage }: UserDetailSheetProps) {
+    const [newRole, setNewRole] = React.useState('')
+    const [roleLoading, setRoleLoading] = React.useState(false)
+    const [actionError, setActionError] = React.useState<string | null>(null)
+    const [actionSuccess, setActionSuccess] = React.useState<string | null>(null)
+
+    React.useEffect(() => {
+        if (user) {
+            setNewRole(user.role)
+            setActionError(null)
+            setActionSuccess(null)
+        }
+    }, [user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleRoleChange = async () => {
+        if (!user) return
+        setRoleLoading(true)
+        setActionError(null)
+        setActionSuccess(null)
+        try {
+            const res = await fetch(`/api/admin/users/${user.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_role', role: newRole }),
+            })
+            const json = await res.json() as { success?: boolean; error?: string }
+            if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+            setActionSuccess(`Role updated to ${ROLE_CONFIG[newRole]?.label ?? newRole}`)
+            onUpdated(currentPage)
+        } catch (e) {
+            setActionError(e instanceof Error ? e.message : 'Action failed')
+        } finally {
+            setRoleLoading(false)
+        }
+    }
+
+    const roleCfg = user ? (ROLE_CONFIG[user.role] ?? ROLE_CONFIG.member) : ROLE_CONFIG.member
+
+    return (
+        <Sheet open={user !== null} onOpenChange={(open) => { if (!open) onClose() }}>
+            <SheetContent className="w-full sm:max-w-md overflow-y-auto">
+                {user && (
+                    <>
+                        <div className="pb-4">
+                            <div className="flex items-center gap-3">
+                                <Avatar className="h-12 w-12 shrink-0">
+                                    <AvatarFallback className="bg-slate-200 text-slate-700 font-semibold">
+                                        {getInitials(user.full_name, user.email)}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                    <h2 className="text-lg font-semibold text-slate-900 truncate">{user.full_name || '—'}</h2>
+                                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Details grid ── */}
+                        <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+                                <p className="text-xs text-slate-500 mb-1">Current Role</p>
+                                <Badge variant="secondary" className={cn('flex items-center gap-1 w-fit', roleCfg.cls)}>
+                                    {roleCfg.icon}
+                                    {roleCfg.label}
+                                </Badge>
+                            </div>
+                            {user.organizations ? (
+                                <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+                                    <p className="text-xs text-slate-500 mb-1">Organization</p>
+                                    <p className="text-sm font-medium text-slate-700">{user.organizations.name}</p>
+                                    <p className={cn('text-xs capitalize mt-0.5', TIER_TEXT_COLORS[user.organizations.subscription_tier] ?? 'text-slate-400')}>
+                                        {user.organizations.subscription_tier} tier
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+                                    <p className="text-xs text-slate-500 mb-1">Organization</p>
+                                    <p className="text-sm text-slate-400">No organization</p>
+                                </div>
+                            )}
+                            <div className="bg-slate-50 rounded-lg p-3 col-span-2">
+                                <p className="text-xs text-slate-500 mb-1">Joined</p>
+                                <p className="text-sm font-medium text-slate-700">{formatAdminDate(user.created_at)}</p>
+                            </div>
+                        </div>
+
+                        {/* ── Feedback ── */}
+                        {actionError && (
+                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                                {actionError}
+                            </div>
+                        )}
+                        {actionSuccess && (
+                            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700">
+                                ✓ {actionSuccess}
+                            </div>
+                        )}
+
+                        {/* ── Change Role ── */}
+                        <div className="border border-slate-200 rounded-xl p-4">
+                            <p className="text-sm font-semibold text-slate-900 mb-1">Change Role</p>
+                            {newRole === 'platform_admin' && newRole !== user.role && (
+                                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-md p-2 mb-3">
+                                    ⚠️ Granting platform_admin gives full access to this admin panel.
+                                </p>
+                            )}
+                            <div className="flex gap-2">
+                                <select
+                                    value={newRole}
+                                    onChange={(e) => setNewRole(e.target.value)}
+                                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                >
+                                    <option value="member">Member</option>
+                                    <option value="owner">Owner</option>
+                                    <option value="platform_admin">Platform Admin</option>
+                                </select>
+                                <Button
+                                    size="sm"
+                                    onClick={handleRoleChange}
+                                    disabled={roleLoading || newRole === user.role}
+                                >
+                                    {roleLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update'}
+                                </Button>
+                            </div>
+                        </div>
+                    </>
+                )}
+            </SheetContent>
+        </Sheet>
+    )
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -95,13 +228,16 @@ export default function AdminUsersPage() {
     const [search, setSearch] = React.useState('')
     const [role, setRole] = React.useState('')
     const [page, setPage] = React.useState(1)
+    const [isSearching, setIsSearching] = React.useState(false)
+    const [selectedUser, setSelectedUser] = React.useState<UserRow | null>(null)
 
-    const fetchUsers = React.useCallback(async () => {
+    // fetchUsers takes targetPage explicitly — avoids double-fetch race condition
+    const fetchUsers = React.useCallback(async (targetPage: number) => {
         setLoading(true)
         setError(null)
         try {
             const params = new URLSearchParams({
-                page: String(page),
+                page: String(targetPage),
                 pageSize: '20',
                 ...(search && { search }),
                 ...(role && { role }),
@@ -114,21 +250,24 @@ export default function AdminUsersPage() {
         } finally {
             setLoading(false)
         }
-    }, [page, search, role])
+    }, [search, role]) // page NOT in deps — passed as argument
 
+    // Search/role filter: debounced 300ms, resets to page 1
     React.useEffect(() => {
+        setIsSearching(true)
         const t = setTimeout(() => {
+            setIsSearching(false)
             setPage(1)
-            fetchUsers()
+            fetchUsers(1)
         }, 300)
-        return () => clearTimeout(t)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, role])
+        return () => { clearTimeout(t); setIsSearching(false) }
+    }, [search, role, fetchUsers])
 
-    React.useEffect(() => {
-        fetchUsers()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page])
+    // Pagination: called directly from buttons (no effect)
+    const goToPage = (next: number) => {
+        setPage(next)
+        fetchUsers(next)
+    }
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -141,7 +280,7 @@ export default function AdminUsersPage() {
                     </p>
                 </div>
                 <button
-                    onClick={fetchUsers}
+                    onClick={() => fetchUsers(page)}
                     disabled={loading}
                     className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
                 >
@@ -153,9 +292,13 @@ export default function AdminUsersPage() {
             <Card>
                 <CardHeader className="pb-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                        {/* Search */}
+                        {/* Search with loading indicator */}
                         <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            {isSearching ? (
+                                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 animate-spin" />
+                            ) : (
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                            )}
                             <Input
                                 placeholder="Search by name or email…"
                                 value={search}
@@ -215,7 +358,8 @@ export default function AdminUsersPage() {
                                         return (
                                             <tr
                                                 key={u.id}
-                                                className="border-b border-slate-50 hover:bg-slate-50 transition-colors"
+                                                onClick={() => setSelectedUser(u)}
+                                                className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
                                             >
                                                 {/* User */}
                                                 <td className="px-4 py-3">
@@ -254,7 +398,7 @@ export default function AdminUsersPage() {
                                                             </p>
                                                             <p className={cn(
                                                                 'text-xs capitalize',
-                                                                TIER_COLORS[u.organizations.subscription_tier] ?? 'text-slate-400'
+                                                                TIER_TEXT_COLORS[u.organizations.subscription_tier] ?? 'text-slate-400'
                                                             )}>
                                                                 {u.organizations.subscription_tier}
                                                             </p>
@@ -265,7 +409,7 @@ export default function AdminUsersPage() {
                                                 </td>
                                                 {/* Joined */}
                                                 <td className="px-4 py-3 text-right text-slate-500 text-xs">
-                                                    {formatDate(u.created_at)}
+                                                    {formatAdminDate(u.created_at)}
                                                 </td>
                                             </tr>
                                         )
@@ -275,22 +419,22 @@ export default function AdminUsersPage() {
                         </table>
                     </div>
 
-                    {/* Pagination */}
-                    {data && data.totalPages > 1 && (
+                    {/* Pagination — always visible when there's data */}
+                    {data && data.total > 0 && (
                         <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100">
                             <span className="text-xs text-slate-500">
-                                Page {data.page} of {data.totalPages} · {data.total} results
+                                Page {data.page} of {Math.max(1, data.totalPages)} · {data.total} results
                             </span>
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                                    onClick={() => goToPage(Math.max(1, page - 1))}
                                     disabled={page <= 1}
                                     className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     <ChevronLeft className="h-4 w-4" />
                                 </button>
                                 <button
-                                    onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
+                                    onClick={() => goToPage(Math.min(data.totalPages, page + 1))}
                                     disabled={page >= data.totalPages}
                                     className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
@@ -301,6 +445,14 @@ export default function AdminUsersPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* User detail sheet */}
+            <UserDetailSheet
+                user={selectedUser}
+                onClose={() => setSelectedUser(null)}
+                onUpdated={fetchUsers}
+                currentPage={page}
+            />
         </div>
     )
 }

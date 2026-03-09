@@ -4,9 +4,8 @@ import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import * as Sentry from '@sentry/nextjs'
 
-// Pricing tiers for MRR calculation
+// Pricing for ACTIVE paid subscriptions only
 const TIER_PRICING: Record<string, number> = {
-    free: 0,
     pro: 29,
     business: 99,
 }
@@ -40,7 +39,7 @@ export async function GET() {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
         }
 
-        // 2. Use service role to bypass RLS for cross-tenant queries
+        // 2. Service role client for cross-tenant queries
         if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
             return NextResponse.json({ error: 'Service role key not configured' }, { status: 500 })
         }
@@ -51,31 +50,44 @@ export async function GET() {
             { auth: { autoRefreshToken: false, persistSession: false } }
         )
 
-        // 3. Parallel queries for efficiency
         const now = new Date()
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+        const nowIso = now.toISOString()
 
+        // 3. Parallel aggregate queries — no row-limit issues
+        //    - Tier counts use separate count queries (avoids fetching all rows)
+        //    - MRR filters active subscriptions only (current_period_end in the future or null)
+        //    - Token usage uses server-side SUM via RPC (avoids 1000-row PostgREST limit)
         const [
             orgsResult,
             usersResult,
-            tierCountsResult,
-            tokenUsageResult,
+            freeCount,
+            proCount,
+            businessCount,
+            proActiveCount,
+            businessActiveCount,
+            tokenResult,
             recentOrgsResult,
         ] = await Promise.all([
-            // Total org count
             supabaseAdmin.from('organizations').select('id', { count: 'exact', head: true }),
-            // Total user count
             supabaseAdmin.from('profiles').select('id', { count: 'exact', head: true }),
-            // Tier distribution
-            supabaseAdmin
-                .from('organizations')
-                .select('subscription_tier'),
-            // AI token usage this month
-            supabaseAdmin
-                .from('usage_logs')
-                .select('effective_tokens')
-                .gte('created_at', startOfMonth),
-            // Recent 5 org signups
+            // Tier counts
+            supabaseAdmin.from('organizations').select('id', { count: 'exact', head: true })
+                .eq('subscription_tier', 'free'),
+            supabaseAdmin.from('organizations').select('id', { count: 'exact', head: true })
+                .eq('subscription_tier', 'pro'),
+            supabaseAdmin.from('organizations').select('id', { count: 'exact', head: true })
+                .eq('subscription_tier', 'business'),
+            // MRR: paid + active (period not yet ended)
+            supabaseAdmin.from('organizations').select('id', { count: 'exact', head: true })
+                .eq('subscription_tier', 'pro')
+                .or(`current_period_end.is.null,current_period_end.gt.${nowIso}`),
+            supabaseAdmin.from('organizations').select('id', { count: 'exact', head: true })
+                .eq('subscription_tier', 'business')
+                .or(`current_period_end.is.null,current_period_end.gt.${nowIso}`),
+            // Server-side SUM — bypasses 1000-row PostgREST default limit
+            supabaseAdmin.rpc('admin_token_usage_this_month', { start_date: startOfMonth }),
+            // Recent 5 signups
             supabaseAdmin
                 .from('organizations')
                 .select('id, name, slug, subscription_tier, created_at')
@@ -83,35 +95,24 @@ export async function GET() {
                 .limit(5),
         ])
 
-        // Calculate tier breakdown and MRR
-        const tierCounts: Record<string, number> = { free: 0, pro: 0, business: 0 }
-        if (tierCountsResult.data) {
-            for (const org of tierCountsResult.data) {
-                const tier = org.subscription_tier as string
-                tierCounts[tier] = (tierCounts[tier] ?? 0) + 1
-            }
+        const tierCounts = {
+            free: freeCount.count ?? 0,
+            pro: proCount.count ?? 0,
+            business: businessCount.count ?? 0,
         }
 
-        const estimatedMRR = Object.entries(tierCounts).reduce((sum, [tier, count]) => {
-            return sum + (TIER_PRICING[tier] ?? 0) * count
-        }, 0)
-
-        const paidSubscriptions = (tierCounts.pro ?? 0) + (tierCounts.business ?? 0)
-
-        // Sum AI tokens this month
-        const tokensThisMonth = tokenUsageResult.data?.reduce(
-            (sum, row) => sum + (row.effective_tokens ?? 0),
-            0
-        ) ?? 0
+        const estimatedMRR =
+            (proActiveCount.count ?? 0) * TIER_PRICING.pro +
+            (businessActiveCount.count ?? 0) * TIER_PRICING.business
 
         return NextResponse.json({
             totalOrganizations: orgsResult.count ?? 0,
             totalUsers: usersResult.count ?? 0,
-            paidSubscriptions,
-            freeTier: tierCounts.free ?? 0,
+            paidSubscriptions: tierCounts.pro + tierCounts.business,
+            freeTier: tierCounts.free,
             tierCounts,
             estimatedMRR,
-            tokensThisMonth,
+            tokensThisMonth: (tokenResult.data as number) ?? 0,
             recentOrganizations: recentOrgsResult.data ?? [],
         })
     } catch (error) {
