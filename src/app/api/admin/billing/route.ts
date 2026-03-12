@@ -86,7 +86,9 @@ export async function GET(request: NextRequest) {
                         if (!org.stripe_subscription_id) return { ...org, stripe_status: 'free' }
                         try {
                             const sub = await stripe.subscriptions.retrieve(org.stripe_subscription_id as string)
-                            return { ...org, stripe_status: sub.status, stripe_current_period_end: sub.current_period_end }
+                            // In Stripe v17+, current_period_end is on the subscription item
+                            const periodEnd = sub.items?.data?.[0]?.current_period_end ?? null
+                            return { ...org, stripe_status: sub.status, stripe_current_period_end: periodEnd }
                         } catch {
                             return { ...org, stripe_status: 'unknown' }
                         }

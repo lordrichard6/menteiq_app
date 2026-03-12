@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { useTheme } from 'next-themes'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -22,6 +23,10 @@ import {
     Crown,
     ExternalLink,
     AlertCircle,
+    Sun,
+    Moon,
+    Monitor,
+    Palette,
 } from 'lucide-react'
 import { getSupportedCountries, TAX_RATES } from '@/lib/invoices/tax-rates'
 import { toast } from 'sonner'
@@ -74,9 +79,39 @@ function isValidIBAN(iban: string): boolean {
     return /^[A-Z]{2}\d{2}[A-Z0-9]{8,30}$/.test(cleaned)
 }
 
-// ─── Component ──────────────────────────────────────────────────────────────
+// ─── Theme option config ─────────────────────────────────────────────────────
+
+const THEME_OPTIONS = [
+    {
+        value: 'light',
+        label: 'Light',
+        description: 'Clean white interface',
+        icon: Sun,
+        preview: 'bg-white border-slate-200',
+        previewInner: 'bg-slate-100',
+    },
+    {
+        value: 'dark',
+        label: 'Dark',
+        description: 'Deep navy blue',
+        icon: Moon,
+        preview: 'bg-[#0D1523] border-[#1E2E47]',
+        previewInner: 'bg-[#131E30]',
+    },
+    {
+        value: 'system',
+        label: 'System',
+        description: 'Follows your OS setting',
+        icon: Monitor,
+        preview: 'bg-gradient-to-r from-white to-[#0D1523] border-slate-300',
+        previewInner: 'bg-gradient-to-r from-slate-100 to-[#131E30]',
+    },
+] as const
+
+// ─── Component ───────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+    const { theme, setTheme } = useTheme()
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [orgId, setOrgId] = useState<string | null>(null)
@@ -780,6 +815,78 @@ export default function SettingsPage() {
                                 ))}
                             </div>
                         )}
+                    </CardContent>
+                </Card>
+
+                {/* ── Appearance ───────────────────────────────────────────── */}
+                <Card className="border-slate-200 bg-white shadow-sm dark:border-[#1E2E47] dark:bg-[#131E30]">
+                    <CardHeader className="flex flex-row items-center gap-3">
+                        <Palette className="h-5 w-5 text-[#3D4A67] dark:text-[#4A7FD4]" />
+                        <div>
+                            <CardTitle className="text-[#3D4A67] dark:text-white">Appearance</CardTitle>
+                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                                Choose how MenteIQ looks for you
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-3 gap-4">
+                            {THEME_OPTIONS.map((opt) => {
+                                const Icon = opt.icon
+                                const isActive = theme === opt.value
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setTheme(opt.value)}
+                                        className={`group relative flex flex-col items-center gap-3 rounded-xl border-2 p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3D4A67] dark:focus-visible:ring-[#4A7FD4] ${
+                                            isActive
+                                                ? 'border-[#3D4A67] dark:border-[#4A7FD4] ring-2 ring-[#3D4A67]/20 dark:ring-[#4A7FD4]/30'
+                                                : 'border-slate-200 dark:border-[#1E2E47] hover:border-slate-300 dark:hover:border-[#2A3A56]'
+                                        }`}
+                                    >
+                                        {/* Mini preview window */}
+                                        <div className={`w-full h-20 rounded-lg border-2 overflow-hidden ${opt.preview}`}>
+                                            {/* Fake top bar */}
+                                            <div className={`h-4 w-full flex items-center gap-1 px-2 ${opt.previewInner}`}>
+                                                <span className="w-2 h-2 rounded-full bg-red-400/70" />
+                                                <span className="w-2 h-2 rounded-full bg-yellow-400/70" />
+                                                <span className="w-2 h-2 rounded-full bg-green-400/70" />
+                                            </div>
+                                            {/* Fake content rows */}
+                                            <div className="p-2 space-y-1.5">
+                                                <div className={`h-2 rounded w-3/4 opacity-40 ${opt.previewInner}`} />
+                                                <div className={`h-2 rounded w-1/2 opacity-30 ${opt.previewInner}`} />
+                                                <div className={`h-2 rounded w-2/3 opacity-20 ${opt.previewInner}`} />
+                                            </div>
+                                        </div>
+
+                                        {/* Label */}
+                                        <div className="flex items-center gap-2">
+                                            <Icon className={`h-4 w-4 ${isActive ? 'text-[#3D4A67] dark:text-[#4A7FD4]' : 'text-slate-400'}`} />
+                                            <span className={`text-sm font-medium ${isActive ? 'text-[#3D4A67] dark:text-[#4A7FD4]' : 'text-slate-700 dark:text-slate-300'}`}>
+                                                {opt.label}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                                            {opt.description}
+                                        </p>
+
+                                        {/* Active indicator */}
+                                        {isActive && (
+                                            <span className="absolute top-2.5 right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#3D4A67] dark:bg-[#4A7FD4]">
+                                                <svg className="h-2.5 w-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
+                                                    <path d="M10 3L5 8.5 2 5.5l-1 1L5 10.5l6-7-1-0.5z" />
+                                                </svg>
+                                            </span>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                        <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+                            Theme preference is saved locally in your browser.
+                        </p>
                     </CardContent>
                 </Card>
 

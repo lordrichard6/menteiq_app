@@ -5,6 +5,7 @@ import { TRPCProvider } from "@/lib/trpc/provider";
 import { CookieConsentBanner } from "@/components/cookie-consent-banner";
 import { Analytics } from "@vercel/analytics/react";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -77,9 +78,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         {/* Structured data — SoftwareApplication + Organization (schema.org) */}
@@ -148,10 +148,18 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <TRPCProvider>{children}</TRPCProvider>
-        <CookieConsentBanner />
-        <Analytics />
-        <Toaster richColors position="top-right" />
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          storageKey="menteiq-theme"
+        >
+          <TRPCProvider>{children}</TRPCProvider>
+          <CookieConsentBanner />
+          <Analytics />
+          <Toaster richColors position="top-right" />
+        </ThemeProvider>
       </body>
     </html>
   );

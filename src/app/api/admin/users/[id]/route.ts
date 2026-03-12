@@ -71,7 +71,7 @@ export async function PATCH(
                 .update({ role: body.role })
                 .eq('id', id)
             if (updateError) throw updateError
-            await client.from('admin_audit_log').insert({ action: 'update_role', target_type: 'user', target_id: id, details: { role: body.role } }).then(() => {}).catch(() => {})
+            await client.from('admin_audit_log').insert({ action: 'update_role', target_type: 'user', target_id: id, details: { role: body.role } }).then(null, () => {})
             return NextResponse.json({ success: true })
         }
 
@@ -123,7 +123,7 @@ export async function DELETE(
             target_type: 'user',
             target_id: id,
             details: { email: profile?.email },
-        }).throwOnError().then(() => {}).catch(() => {}) // non-blocking
+        }).throwOnError().then(null, () => {}) // non-blocking
 
         return NextResponse.json({ success: true })
     } catch (error) {

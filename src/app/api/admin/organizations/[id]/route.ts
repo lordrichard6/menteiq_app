@@ -73,7 +73,7 @@ export async function PATCH(
                 .update({ subscription_tier: body.tier })
                 .eq('id', id)
             if (updateError) throw updateError
-            await client.from('admin_audit_log').insert({ action: 'update_tier', target_type: 'organization', target_id: id, details: { tier: body.tier } }).then(() => {}).catch(() => {})
+            await client.from('admin_audit_log').insert({ action: 'update_tier', target_type: 'organization', target_id: id, details: { tier: body.tier } }).then(null, () => {})
             return NextResponse.json({ success: true })
         }
 
@@ -100,7 +100,7 @@ export async function PATCH(
                 .update({ token_balance: (org?.token_balance ?? 0) + amount })
                 .eq('id', id)
             if (updateError) throw updateError
-            await client.from('admin_audit_log').insert({ action: 'add_tokens', target_type: 'organization', target_id: id, details: { amount } }).then(() => {}).catch(() => {})
+            await client.from('admin_audit_log').insert({ action: 'add_tokens', target_type: 'organization', target_id: id, details: { amount } }).then(null, () => {})
             return NextResponse.json({ success: true })
         }
 
@@ -155,7 +155,7 @@ export async function DELETE(
             target_type: 'organization',
             target_id: id,
             details: { member_count: memberIds.length },
-        }).throwOnError().then(() => {}).catch(() => {}) // non-blocking
+        }).throwOnError().then(null, () => {}) // non-blocking
 
         return NextResponse.json({ success: true, deleted_users: memberIds.length })
     } catch (error) {
