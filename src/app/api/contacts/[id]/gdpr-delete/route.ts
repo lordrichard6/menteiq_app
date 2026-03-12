@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import { logActivity } from '@/lib/activity-log'
 
@@ -121,7 +122,7 @@ export async function DELETE(
             .eq('id', contactId)
 
         if (deleteError) {
-            console.error('GDPR deletion error:', deleteError)
+            Sentry.captureException(deleteError, { extra: { contactId } })
             return NextResponse.json(
                 { error: 'Failed to delete contact', details: deleteError.message },
                 { status: 500 }
@@ -134,8 +135,8 @@ export async function DELETE(
             deletion_certificate: deletionCertificate,
         })
     } catch (error: unknown) {
+        Sentry.captureException(error)
         const message = error instanceof Error ? error.message : 'Unknown error'
-        console.error('GDPR deletion error:', error)
         return NextResponse.json(
             { error: 'Failed to process GDPR deletion', details: message },
             { status: 500 }

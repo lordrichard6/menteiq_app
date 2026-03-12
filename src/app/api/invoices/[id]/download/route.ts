@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { generateInvoicePDF } from '@/lib/invoices/pdf-generator'
+import { NextResponse } from 'next/server'
 import type { InvoiceWithLineItems } from '@/lib/services/invoice-service'
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -7,6 +8,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { searchParams } = new URL(request.url)
     const preview = searchParams.get('preview') === 'true'
     const supabase = await createClient()
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Fetch invoice with full contact address for PDF generation
     const { data: invoice, error } = await supabase

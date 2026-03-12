@@ -32,9 +32,9 @@ export const useMilestoneStore = create<MilestoneStore>()((set, get) => ({
 
             if (error) throw error
             set({ milestones: data as Milestone[], isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching milestones:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
         }
     },
 
@@ -69,9 +69,9 @@ export const useMilestoneStore = create<MilestoneStore>()((set, get) => ({
                 milestones: [...state.milestones, newMilestone].sort((a, b) => a.order_index - b.order_index)
             }))
             return newMilestone
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error adding milestone:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
             return null
         }
     },
@@ -90,9 +90,9 @@ export const useMilestoneStore = create<MilestoneStore>()((set, get) => ({
                 milestones: state.milestones.map((m) => m.id === id ? { ...m, ...input } : m)
                     .sort((a, b) => a.order_index - b.order_index)
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating milestone:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -109,9 +109,9 @@ export const useMilestoneStore = create<MilestoneStore>()((set, get) => ({
             set((state) => ({
                 milestones: state.milestones.filter((m) => m.id !== id)
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error deleting milestone:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -135,9 +135,9 @@ export const useMilestoneStore = create<MilestoneStore>()((set, get) => ({
                     return newIndex !== -1 ? { ...m, order_index: newIndex } : m
                 }).sort((a, b) => a.order_index - b.order_index)
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error reordering milestones:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     }
 }))

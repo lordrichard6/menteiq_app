@@ -13,10 +13,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
     "prepare": "husky"
   },
   "notes": {
-    "xlsx": "SheetJS (xlsx) has known high-severity vulns (GHSA-4r6h-8v6p-xvw6, GHSA-5pgg-2g8v-p4x9). No safe upgrade path exists on npm — SheetJS moved to commercial model after 0.18.5. Options: (1) replace with exceljs, (2) pin and accept risk for internal-only use, (3) purchase SheetJS Pro license."
+    "xlsx": "Replaced with exceljs@4.4.0 (2026-03-12). Server-side export uses ExcelJS. Client-side import dialog uses dynamic import('exceljs') to avoid bundling ~750KB in the initial JS chunk."
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.41",
@@ -44,19 +47,20 @@
     "@trpc/server": "^11.8.1",
     "@types/papaparse": "^5.5.2",
     "@types/pdfkit": "^0.17.4",
-    "@vercel/analytics": "^1.6.1",
+    "@vercel/analytics": "^2.0.1",
     "ai": "^6.0.68",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.4",
+    "exceljs": "^4.4.0",
     "fuse.js": "^7.1.0",
     "libphonenumber-js": "^1.12.36",
     "lucide-react": "^0.562.0",
     "mammoth": "^1.11.0",
     "next": "^16.1.6",
     "papaparse": "^5.5.3",
-    "pdf-parse": "^1.1.1",
+    "pdf-parse": "^2.4.5",
     "pdfkit": "^0.17.2",
     "qrcode": "^1.5.4",
     "radix-ui": "^1.4.3",
@@ -68,7 +72,6 @@
     "stripe": "^20.3.1",
     "swissqrbill": "^4.2.1",
     "tailwind-merge": "^3.4.0",
-    "xlsx": "^0.18.5",
     "zod": "^4.3.5",
     "zustand": "^5.0.10"
   },
@@ -81,6 +84,7 @@
     ]
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^25.3.5",
     "@types/qrcode": "^1.5.6",

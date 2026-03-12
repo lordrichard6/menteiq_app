@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase/server';
 import { sendEmail } from '@/lib/email/resend-client';
 import {
@@ -16,6 +17,11 @@ import {
   TaskReminderEmail,
   FollowUpReminderEmail,
 } from '@/lib/email/notification-templates';
+
+/** Shape of the contacts join when selecting (name, email) */
+type ContactWithEmail = { name: string | null; email: string | null };
+/** Shape of the contacts join when selecting (name) only */
+type ContactNameOnly = { name: string | null };
 
 /** Supabase returns joined rows as arrays; extract the first element's property safely */
 function joinedField<T extends Record<string, unknown>>(
@@ -29,6 +35,12 @@ function joinedField<T extends Record<string, unknown>>(
 
 export async function POST(request: NextRequest) {
   try {
+    const authHeader = request.headers.get('authorization')
+    const cronSecret = process.env.CRON_SECRET
+    if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const supabase = await createClient();
 
     // Get all organizations
@@ -88,7 +100,7 @@ export async function POST(request: NextRequest) {
             p_user_id: user.id,
             p_type: 'invoice_overdue',
             p_title: `Invoice #${invoice.invoice_number} is overdue`,
-            p_message: `Invoice for ${joinedField(invoice.contacts as any, 'name') || 'customer'} is ${daysOverdue} days overdue (CHF ${invoice.total})`,
+            p_message: `Invoice for ${joinedField(invoice.contacts as ContactWithEmail | ContactWithEmail[], 'name') || 'customer'} is ${daysOverdue} days overdue (CHF ${invoice.total})`,
             p_priority: daysOverdue > 30 ? 'high' : 'medium',
             p_related_id: invoice.id,
             p_related_type: 'invoice',
@@ -103,7 +115,7 @@ export async function POST(request: NextRequest) {
               const emailHtml = OverdueInvoiceEmail({
                 userName: user.full_name || user.email,
                 invoiceNumber: invoice.invoice_number,
-                customerName: (joinedField(invoice.contacts as any, 'name') as string) || 'Customer',
+                customerName: (joinedField(invoice.contacts as ContactWithEmail | ContactWithEmail[], 'name') as string) || 'Customer',
                 amount: invoice.total,
                 daysOverdue,
                 invoiceUrl: `${process.env.NEXT_PUBLIC_APP_URL}/admin/invoices/${invoice.id}`,
@@ -172,7 +184,7 @@ export async function POST(request: NextRequest) {
                 userName: user.full_name || user.email,
                 taskTitle: task.title,
                 dueDate: new Date(task.due_date),
-                contactName: joinedField(task.contacts as any, 'name') as string | undefined,
+                contactName: joinedField(task.contacts as ContactNameOnly | ContactNameOnly[], 'name') as string | undefined,
                 taskUrl: `${process.env.NEXT_PUBLIC_APP_URL}/admin/tasks/${task.id}`,
               });
 
@@ -284,13 +296,13 @@ export async function POST(request: NextRequest) {
       message: 'Notification check complete',
       results,
     });
-  } catch (error: any) {
-    console.error('Notification trigger error:', error);
+  } catch (error: unknown) {
+    Sentry.captureException(error);
     return NextResponse.json(
       {
         success: false,
         error: 'Failed to check notification triggers',
-        details: error.message,
+        details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

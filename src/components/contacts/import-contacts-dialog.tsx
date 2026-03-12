@@ -3,7 +3,8 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
+// ExcelJS is lazy-loaded on demand (only when user uploads an .xlsx file)
+// to avoid including the ~750KB library in the initial JS bundle.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Upload, FileSpreadsheet, File, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react'
@@ -27,7 +28,7 @@ interface ParsedData {
 }
 
 // MenteIQ field definitions
-const ORBITCRM_FIELDS = [
+const MENTEIQ_FIELDS = [
   { value: 'firstName', label: 'First Name', required: true },
   { value: 'lastName', label: 'Last Name', required: false },
   { value: 'fullName', label: 'Full Name (auto-split)', required: false },
@@ -117,7 +118,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
             const headers = results.meta.fields || []
             setParsedData({
               headers,
-              rows: results.data,
+              rows: results.data as Record<string, unknown>[],
               fileName: file.name,
               fileType: 'csv'
             })
@@ -129,21 +130,27 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
           }
         })
       } else if (fileType === 'xlsx') {
-        // Parse Excel
+        // Parse Excel — dynamically import ExcelJS to keep it out of the initial bundle.
+        const ExcelJS = await import('exceljs')
         const data = await file.arrayBuffer()
-        const workbook = XLSX.read(data, { type: 'array' })
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+        const workbook = new ExcelJS.Workbook()
+        await workbook.xlsx.load(data)
+        const worksheet = workbook.worksheets[0]
 
-        if (jsonData.length < 2) {
+        // ExcelJS rows are 1-indexed; row.values[0] is always null (it uses 1-based column indices)
+        const allRows: unknown[][] = []
+        worksheet.eachRow(row => {
+          allRows.push((row.values as unknown[]).slice(1)) // drop index-0 null
+        })
+
+        if (allRows.length < 2) {
           setError('Excel file must have at least 2 rows (header + data).')
           return
         }
 
-        const headers = (jsonData[0] as unknown[]).map(String)
-        const rows = jsonData.slice(1).map((row: unknown) => {
+        const headers = allRows[0].map(String)
+        const rows = allRows.slice(1).map((rowArr: unknown[]) => {
           const obj: Record<string, unknown> = {}
-          const rowArr = row as unknown[]
           headers.forEach((header, index) => {
             obj[header] = rowArr[index] ?? ''
           })
@@ -418,7 +425,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {ORBITCRM_FIELDS.map((field) => (
+                              {MENTEIQ_FIELDS.map((field) => (
                                 <SelectItem key={field.value} value={field.value}>
                                   <div className="flex items-center gap-2">
                                     {field.label} {field.required && <Badge variant="destructive" className="ml-1 text-xs">Required</Badge>}
@@ -429,7 +436,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                           </Select>
                         </TableCell>
                         <TableCell className="text-sm text-gray-500 italic max-w-0 truncate">
-                          {parsedData.rows[0]?.[header] || '(empty)'}
+                          {String(parsedData.rows[0]?.[header] ?? '(empty)')}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -481,7 +488,7 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                 <Table className="w-full" style={{ minWidth: '800px' }}>
                   <TableHeader>
                     <TableRow>
-                      {ORBITCRM_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
+                      {MENTEIQ_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
                         <TableHead key={field.value} className="whitespace-nowrap font-semibold">
                           {field.label}
                         </TableHead>
@@ -491,9 +498,9 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
                   <TableBody>
                     {previewData.map((row, i) => (
                       <TableRow key={i}>
-                        {ORBITCRM_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
+                        {MENTEIQ_FIELDS.filter(f => f.value !== 'skip' && Object.values(columnMapping).includes(f.value)).map((field) => (
                           <TableCell key={`${i}-${field.value}`} className="whitespace-nowrap">
-                            {row[field.value] || '-'}
+                            {String(row[field.value] ?? '-')}
                           </TableCell>
                         ))}
                       </TableRow>

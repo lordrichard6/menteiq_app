@@ -15,11 +15,38 @@ import { PortalSession } from '@/lib/portal/session';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 
+interface PortalInvoice {
+  id: string;
+  invoice_number: string;
+  amount_total: number;
+  currency: string;
+  status: string;
+  invoice_date: string;
+  due_date?: string | null;
+}
+
+interface PortalDocument {
+  id: string;
+  name: string;
+  file_url?: string | null;
+  created_at: string;
+}
+
+interface PortalProject {
+  id: string;
+  name: string;
+  status: string;
+  description?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  progress?: number | null;
+}
+
 interface PortalDashboardClientProps {
   session: PortalSession;
-  invoices: any[];
-  documents: any[];
-  projects: any[];
+  invoices: PortalInvoice[];
+  documents: PortalDocument[];
+  projects: PortalProject[];
 }
 
 export function PortalDashboardClient({
@@ -116,7 +143,7 @@ export function PortalDashboardClient({
   };
 
   // Calculate stats
-  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.total || 0), 0);
+  const totalInvoiced = invoices.reduce((sum, inv) => sum + (inv.amount_total || 0), 0);
   const activeProjects = projects.filter((p) => p.status === 'active').length;
 
   return (
@@ -129,7 +156,7 @@ export function PortalDashboardClient({
               Welcome back, {session.contact_name.split(' ')[0]}
             </h1>
             <p className="text-slate-600 mt-1">
-              Here's an overview of your account
+              Here&apos;s an overview of your account
             </p>
           </div>
           <Button
@@ -227,12 +254,12 @@ export function PortalDashboardClient({
                         </div>
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           <Clock className="h-3 w-3" />
-                          {format(new Date(invoice.created_at), 'dd MMM yyyy')}
+                          {format(new Date(invoice.invoice_date), 'dd MMM yyyy')}
                         </div>
                       </div>
                       <div className="flex items-center gap-3 ml-4">
                         <span className="text-sm font-semibold text-slate-900">
-                          CHF {invoice.total?.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
+                          CHF {invoice.amount_total?.toLocaleString('de-CH', { minimumFractionDigits: 2 })}
                         </span>
                         <Button
                           size="sm"

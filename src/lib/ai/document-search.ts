@@ -77,6 +77,7 @@ export async function searchDocuments(
     }
 
     // Transform results
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results: SearchResult[] = data.map((row: any) => ({
       id: row.id,
       documentId: row.document_id,
@@ -213,6 +214,7 @@ export async function keywordSearchDocuments(
     }
 
     // Transform results (similarity = 0.75 as approximate value for keyword matches)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const results: SearchResult[] = data.map((row: any) => ({
       id: row.id,
       documentId: row.document_id,
@@ -260,6 +262,7 @@ export async function getRelatedChunks(
       return [];
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (data || []).map((row: any) => ({
       content: row.content,
       index: row.chunk_index,

@@ -1,6 +1,6 @@
-# OrbitCRM Modules
+# MenteIQ Modules
 
-This directory contains the modular feature system for OrbitCRM.
+This directory contains the modular feature system for MenteIQ.
 
 ## Structure
 
@@ -23,7 +23,7 @@ This directory contains the modular feature system for OrbitCRM.
 ## Architecture
 
 ### Core Modules
-Always enabled for all users. These provide the base functionality of OrbitCRM.
+Always enabled for all users. These provide the base functionality of MenteIQ.
 
 ### Vertical Packs
 Premium modules that can be enabled per tenant based on their subscription tier:

@@ -5,6 +5,7 @@
  */
 
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 
 interface DuplicateGroup {
@@ -233,10 +234,10 @@ export async function GET(req: Request) {
             total: duplicateGroups.length,
             contactsAffected: processedIds.size,
         })
-    } catch (error: any) {
-        console.error('Duplicate detection error:', error)
+    } catch (error: unknown) {
+        Sentry.captureException(error)
         return NextResponse.json(
-            { error: error.message || 'Failed to detect duplicates' },
+            { error: error instanceof Error ? error.message : 'Failed to detect duplicates' },
             { status: 500 }
         )
     }
@@ -309,10 +310,10 @@ export async function POST(req: Request) {
             primaryId,
             mergedCount: duplicateIds.length,
         })
-    } catch (error: any) {
-        console.error('Merge contacts error:', error)
+    } catch (error: unknown) {
+        Sentry.captureException(error)
         return NextResponse.json(
-            { error: error.message || 'Failed to merge contacts' },
+            { error: error instanceof Error ? error.message : 'Failed to merge contacts' },
             { status: 500 }
         )
     }

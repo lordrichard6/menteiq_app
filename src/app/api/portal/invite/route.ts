@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase/server';
 import { sendPortalInvitation } from '@/lib/email/resend-client';
 import { inviteLimiter, rateLimitResponse } from '@/lib/rate-limit';
@@ -104,7 +105,7 @@ export async function POST(request: NextRequest) {
       });
 
     if (sessionError) {
-      console.error('Failed to create portal session:', sessionError);
+      Sentry.captureException(sessionError, { extra: { contactId } });
       return NextResponse.json(
         { error: 'Failed to create portal session' },
         { status: 500 }
@@ -126,7 +127,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (!emailResult.success) {
-      console.error('Failed to send email:', emailResult.error);
+      Sentry.captureMessage('Failed to send portal invitation email', {
+        level: 'error',
+        extra: { error: emailResult.error, contactId },
+      });
       return NextResponse.json(
         { error: 'Failed to send invitation email' },
         { status: 500 }
@@ -145,7 +149,7 @@ export async function POST(request: NextRequest) {
       email: contact.email,
     });
   } catch (error) {
-    console.error('Portal invite error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

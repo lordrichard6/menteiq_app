@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import { generateInvoicePDF } from '@/lib/invoices/pdf-generator'
 import type { InvoiceWithLineItems } from '@/lib/services/invoice-service'
@@ -87,7 +88,7 @@ export async function GET(
             },
         })
     } catch (error) {
-        console.error('Portal invoice download error:', error)
+        Sentry.captureException(error)
         return NextResponse.json(
             { error: 'Failed to generate PDF' },
             { status: 500 }

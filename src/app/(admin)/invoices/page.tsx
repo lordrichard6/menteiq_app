@@ -37,8 +37,16 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { CreateInvoiceDialog } from '@/components/modules/invoicing/create-invoice-dialog'
+import dynamic from 'next/dynamic'
 import { useState, useEffect } from 'react'
+
+const CreateInvoiceDialog = dynamic(
+  () => import('@/components/modules/invoicing/create-invoice-dialog').then(m => ({ default: m.CreateInvoiceDialog })),
+  {
+    ssr: false,
+    loading: () => <div className="animate-pulse h-9 w-36 rounded-lg bg-slate-200" />,
+  }
+)
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {

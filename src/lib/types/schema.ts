@@ -9,7 +9,7 @@
 // ENUMS
 // =====================================================
 
-export type UserRole = 'owner' | 'member';
+export type UserRole = 'owner' | 'member' | 'platform_admin';
 export type ContactStatus = 'lead' | 'opportunity' | 'client' | 'churned';
 export type ProjectStatus = 'lead' | 'active' | 'on_hold' | 'completed' | 'archived';
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';

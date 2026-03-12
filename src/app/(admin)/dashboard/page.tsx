@@ -6,7 +6,15 @@ import { useContactStore } from '@/stores/contact-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useTaskStore } from '@/stores/task-store'
 import { useInvoiceStore } from '@/stores/invoice-store'
-import { OrganizationActivityFeed } from '@/components/dashboard/organization-activity-feed'
+import dynamic from 'next/dynamic'
+
+const OrganizationActivityFeed = dynamic(
+  () => import('@/components/dashboard/organization-activity-feed').then(m => ({ default: m.OrganizationActivityFeed })),
+  {
+    ssr: false,
+    loading: () => <div className="animate-pulse h-64 rounded-xl bg-slate-100" />,
+  }
+)
 import type { Contact } from '@/types/contact'
 import {
     Users, FolderKanban, CheckSquare, Receipt, CreditCard,

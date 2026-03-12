@@ -11,6 +11,7 @@ interface ActivityStore {
     fetchActivities: (filters: { entityId?: string; entityType?: string }) => Promise<void>
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToActivity(row: any): ActivityLog {
     return {
         id: row.id,
@@ -57,9 +58,9 @@ export const useActivityStore = create<ActivityStore>()((set) => ({
 
             const activities = (data || []).map(dbToActivity)
             set({ activities, isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching activities:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
         }
     },
 }))

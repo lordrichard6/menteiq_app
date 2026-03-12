@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,8 +60,8 @@ export async function GET(request: NextRequest) {
 
     // Transform contacts based on selected fields
     const exportData = hasContacts
-      ? contacts.map((contact: any) => {
-        const row: any = {}
+      ? contacts.map((contact) => {
+        const row: Record<string, string> = {}
         if (fields.includes('name')) {
           const name = contact.is_company
             ? contact.company_name
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // For PapaParse/XLSX to work correctly with empty data, we provide the columns
     const columns = fields.map(field => {
-      const headerMap: any = {
+      const headerMap: Record<string, string> = {
         'name': 'Name',
         'email': 'Email',
         'phone': 'Phone',
@@ -110,19 +111,23 @@ export async function GET(request: NextRequest) {
         },
       })
     } else if (format === 'xlsx') {
-      // Generate Excel
-      // Generate Excel
-      const worksheet = exportData.length > 0
-        ? XLSX.utils.json_to_sheet(exportData)
-        : XLSX.utils.aoa_to_sheet([columns])
-      const workbook = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'Contacts')
+      // Generate Excel using ExcelJS (no CVEs — replaces xlsx)
+      const workbook = new ExcelJS.Workbook()
+      workbook.creator = 'MenteIQ'
+      workbook.created = new Date()
+      const worksheet = workbook.addWorksheet('Contacts')
 
-      // Write to buffer
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
+      // Bold header row
+      worksheet.columns = columns.map(col => ({ header: col, key: col, width: 20 }))
+      worksheet.getRow(1).font = { bold: true }
+
+      // Data rows
+      exportData.forEach(row => worksheet.addRow(row))
+
+      const buffer = await workbook.xlsx.writeBuffer()
       const filename = `contacts-export-${new Date().toISOString().split('T')[0]}.xlsx`
 
-      return new NextResponse(buffer, {
+      return new NextResponse(buffer as ArrayBuffer, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': `attachment; filename="${filename}"`,
@@ -135,12 +140,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-  } catch (error: any) {
-    console.error('Export error:', error)
+  } catch (error: unknown) {
+    Sentry.captureException(error)
     return NextResponse.json(
       {
         error: 'Internal server error',
-        details: error.message
+        details: error instanceof Error ? error.message : String(error)
       },
       { status: 500 }
     )

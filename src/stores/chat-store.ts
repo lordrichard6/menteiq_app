@@ -20,6 +20,7 @@ interface ChatStore {
 }
 
 // Convert DB row to Message
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToMessage(row: any): Message {
     return {
         id: row.id,
@@ -30,6 +31,7 @@ function dbToMessage(row: any): Message {
 }
 
 // Convert DB row to Conversation
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function dbToConversation(row: any): Conversation {
     return {
         id: row.id,
@@ -68,9 +70,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
 
             const conversations = (data || []).map(dbToConversation)
             set({ conversations, isLoading: false })
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error fetching conversations:', error)
-            set({ error: error.message, isLoading: false })
+            set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
         }
     },
 
@@ -120,9 +122,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                 activeConversationId: newConversation.id,
             }))
             return newConversation
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error creating conversation:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
             return null
         }
     },
@@ -144,9 +146,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                 conversations: state.conversations.filter((c) => c.id !== id),
                 activeConversationId: state.activeConversationId === id ? null : state.activeConversationId,
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error deleting conversation:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -203,9 +205,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
             }
 
             return newMessage
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error adding message:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
             return null
         }
     },
@@ -231,9 +233,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                     c.id === id ? { ...c, title, updatedAt: new Date() } : c
                 ),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating conversation title:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 
@@ -254,9 +256,9 @@ export const useChatStore = create<ChatStore>()((set, get) => ({
                     c.id === id ? { ...c, model, updatedAt: new Date() } : c
                 ),
             }))
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Error updating conversation model:', error)
-            set({ error: error.message })
+            set({ error: error instanceof Error ? error.message : String(error) })
         }
     },
 }))

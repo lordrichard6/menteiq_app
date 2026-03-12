@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If enabling portal, generate a portal token if it doesn't exist
-    let updateData: any = {
+    const updateData: Record<string, unknown> = {
       portal_enabled: enabled,
     };
 
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error) {
-      console.error('Failed to update contact:', error);
+      Sentry.captureException(error, { extra: { contactId, enabled } });
       return NextResponse.json(
         { error: 'Failed to update portal access' },
         { status: 500 }
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
       portal_token: data.portal_token,
     });
   } catch (error) {
-    console.error('Portal toggle error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

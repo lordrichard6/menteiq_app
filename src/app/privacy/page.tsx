@@ -1,5 +1,12 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "MenteIQ Privacy Policy — how we collect, use, and protect your personal data in compliance with GDPR and Swiss nDSG.",
+  alternates: { canonical: "/privacy" },
+};
 
 export default function PrivacyPage() {
     return (

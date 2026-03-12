@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { createClient } from '@/lib/supabase/server';
 import { processDocument, updateDocumentStatus } from '@/lib/ai/document-processor';
 import { generateEmbeddings } from '@/lib/ai/embeddings';
@@ -75,13 +76,9 @@ export async function POST(request: NextRequest) {
         document.file_type || 'application/pdf'
       );
 
-      // chunks.length chunks created for documentId
-
       // Generate embeddings for all chunks (batch)
       const chunkTexts = chunks.map(c => c.content);
       const { embeddings, totalTokens } = await generateEmbeddings(chunkTexts);
-
-      // embeddings.length embeddings generated using totalTokens tokens
 
       // Store chunks with embeddings in database
       const chunkRecords = chunks.map((chunk, index) => ({
@@ -101,7 +98,7 @@ export async function POST(request: NextRequest) {
           .insert(batch);
 
         if (insertError) {
-          console.error('Failed to insert chunk batch:', insertError);
+          Sentry.captureException(insertError, { extra: { documentId, batchIndex: i } });
           throw new Error('Failed to store document chunks');
         }
       }
@@ -135,7 +132,7 @@ export async function POST(request: NextRequest) {
       // Update status to error
       await updateDocumentStatus(documentId, 'error');
 
-      console.error('Document processing error:', processingError);
+      Sentry.captureException(processingError, { extra: { documentId } });
 
       return NextResponse.json(
         {
@@ -148,7 +145,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error('API error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
@@ -204,7 +201,7 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('API error:', error);
+    Sentry.captureException(error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

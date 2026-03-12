@@ -59,7 +59,7 @@ export interface ValidationResult {
   valid: ImportContactInput[]
   invalid: {
     row: number
-    data: any
+    data: unknown
     errors: z.ZodError
   }[]
   duplicates: {
@@ -71,7 +71,7 @@ export interface ValidationResult {
 
 // Validate a batch of contacts
 export function validateContacts(
-  contacts: any[],
+  contacts: unknown[],
   existingEmails: Set<string> = new Set()
 ): ValidationResult {
   const result: ValidationResult = {

@@ -83,9 +83,9 @@ export function ExportContactsDialog({ totalContacts }: ExportContactsDialogProp
 
       // Close dialog
       setOpen(false)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Export error:', err)
-      setError(err.message || 'Failed to export contacts')
+      setError(err instanceof Error ? err.message : 'Failed to export contacts')
     } finally {
       setIsExporting(false)
     }

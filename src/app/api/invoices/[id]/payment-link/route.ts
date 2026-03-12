@@ -16,7 +16,12 @@ export async function POST(
 ) {
   try {
     const { id: invoiceId } = await params;
-    
+
+    // Auth check
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
     // Check if Stripe is configured
     if (!StripeService.isConfigured()) {
       return NextResponse.json(
@@ -26,7 +31,6 @@ export async function POST(
     }
 
     // Get the invoice
-    const supabase = await createClient();
     const { data: invoice, error } = await supabase
       .from('invoices')
       .select('*')
@@ -89,9 +93,13 @@ export async function GET(
 ) {
   try {
     const { id: invoiceId } = await params;
-    
-    // Get the invoice's existing payment link
+
+    // Auth check
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Get the invoice's existing payment link
     const { data: invoice, error } = await supabase
       .from('invoices')
       .select('stripe_payment_link, status')

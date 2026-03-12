@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 
 interface ExportData {
@@ -183,8 +184,8 @@ export async function GET(
             })
         }
     } catch (error: unknown) {
+        Sentry.captureException(error)
         const message = error instanceof Error ? error.message : 'Unknown error'
-        console.error('Contact export error:', error)
         return NextResponse.json(
             { error: 'Failed to export contact data', details: message },
             { status: 500 }

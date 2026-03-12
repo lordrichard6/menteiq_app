@@ -1,4 +1,5 @@
 
+import * as Sentry from '@sentry/nextjs';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { openai } from '@ai-sdk/openai';
 import { anthropic } from '@ai-sdk/anthropic';
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
                     query: z.string().describe('The search query')
                 }),
                 execute: async ({ query }: { query: string }) => {
-                    // @ts-ignore
+                    // @ts-expect-error RagService.searchSimilarDocuments accepts visibilityFilter but types don't reflect it
                     const docs = await RagService.searchSimilarDocuments(query, tenantId, visibilityFilter);
                     return docs.length > 0 ? JSON.stringify(docs) : 'No relevant documents found.';
                 }
@@ -156,7 +157,7 @@ Be concise, professional, and helpful.`,
                     p_tokens:    effectiveTokens,
                 });
             } catch (err) {
-                console.error('Token deduction failed:', err);
+                Sentry.captureException(err, { extra: { context: 'token-deduction', tenantId, effectiveTokens } });
                 // Non-fatal — response already delivered
             }
 
@@ -175,7 +176,7 @@ Be concise, professional, and helpful.`,
                         estimated_cost_cents: 0,
                     });
                 } catch (error) {
-                    console.error('Failed to record token usage:', error);
+                    Sentry.captureException(error, { extra: { context: 'token-usage-recording', conversationId } });
                 }
             }
         },
