@@ -19,7 +19,22 @@ import {
     CircleDot,
     CircleOff,
     Circle,
+    Trash2,
+    CheckSquare,
+    Square,
+    ChevronDown,
 } from 'lucide-react'
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { cn } from '@/lib/utils'
 import {
     TIER_COLORS,
@@ -72,12 +87,13 @@ interface OrgDetailSheetProps {
     onClose: () => void
     onUpdated: (updatedPage: number) => void
     currentPage: number
+    onDeleted: () => void
 }
 
-function OrgDetailSheet({ org, onClose, onUpdated, currentPage }: OrgDetailSheetProps) {
+function OrgDetailSheet({ org, onClose, onUpdated, currentPage, onDeleted }: OrgDetailSheetProps) {
     const [newTier, setNewTier] = React.useState('')
     const [tokenAmount, setTokenAmount] = React.useState('')
-    const [actionLoading, setActionLoading] = React.useState<'tier' | 'tokens' | null>(null)
+    const [actionLoading, setActionLoading] = React.useState<'tier' | 'tokens' | 'delete' | null>(null)
     const [actionError, setActionError] = React.useState<string | null>(null)
     const [actionSuccess, setActionSuccess] = React.useState<string | null>(null)
 
@@ -90,6 +106,22 @@ function OrgDetailSheet({ org, onClose, onUpdated, currentPage }: OrgDetailSheet
             setActionSuccess(null)
         }
     }, [org?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleDelete = async () => {
+        if (!org) return
+        setActionLoading('delete')
+        setActionError(null)
+        try {
+            const res = await fetch(`/api/admin/organizations/${org.id}`, { method: 'DELETE' })
+            const json = await res.json() as { success?: boolean; error?: string; deleted_users?: number }
+            if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`)
+            onClose()
+            onDeleted()
+        } catch (e) {
+            setActionError(e instanceof Error ? e.message : 'Delete failed')
+            setActionLoading(null)
+        }
+    }
 
     const doAction = async (action: 'tier' | 'tokens') => {
         if (!org) return
@@ -204,7 +236,7 @@ function OrgDetailSheet({ org, onClose, onUpdated, currentPage }: OrgDetailSheet
                         </div>
 
                         {/* ── Add Tokens ── */}
-                        <div className="border border-slate-200 rounded-xl p-4">
+                        <div className="border border-slate-200 rounded-xl p-4 mb-4">
                             <p className="text-sm font-semibold text-slate-900 mb-1">Add Tokens</p>
                             <p className="text-xs text-slate-500 mb-3">
                                 Grant additional AI tokens. Current balance: {(org.token_balance ?? 0).toLocaleString()}
@@ -229,6 +261,51 @@ function OrgDetailSheet({ org, onClose, onUpdated, currentPage }: OrgDetailSheet
                                 </Button>
                             </div>
                         </div>
+
+                        {/* ── Danger Zone ── */}
+                        <div className="border border-red-200 rounded-xl p-4 bg-red-50/50">
+                            <p className="text-sm font-semibold text-red-700 mb-1 flex items-center gap-1.5">
+                                <Trash2 className="h-4 w-4" />
+                                Danger Zone
+                            </p>
+                            <p className="text-xs text-red-600/80 mb-3">
+                                Permanently delete this organization and all its users, contacts, projects, invoices, and data.
+                                This action is <strong>irreversible</strong>.
+                            </p>
+                            <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        disabled={actionLoading !== null}
+                                        className="w-full"
+                                    >
+                                        {actionLoading === 'delete'
+                                            ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Deleting…</>
+                                            : <><Trash2 className="h-4 w-4 mr-2" />Delete Organization</>
+                                        }
+                                    </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                        <AlertDialogTitle>Delete &ldquo;{org.name}&rdquo;?</AlertDialogTitle>
+                                        <AlertDialogDescription>
+                                            This will permanently delete the organization, all {org.userCount} user{org.userCount !== 1 ? 's' : ''},
+                                            and all associated data. There is no undo.
+                                        </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                        <AlertDialogAction
+                                            onClick={handleDelete}
+                                            className="bg-red-600 hover:bg-red-700 text-white"
+                                        >
+                                            Yes, delete permanently
+                                        </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                </AlertDialogContent>
+                            </AlertDialog>
+                        </div>
                     </>
                 )}
             </SheetContent>
@@ -247,6 +324,13 @@ export default function AdminOrganizationsPage() {
     const [page, setPage] = React.useState(1)
     const [isSearching, setIsSearching] = React.useState(false)
     const [selectedOrg, setSelectedOrg] = React.useState<OrgRow | null>(null)
+    // Bulk selection
+    const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+    const [bulkTier, setBulkTier] = React.useState('free')
+    const [bulkLoading, setBulkLoading] = React.useState(false)
+    const [bulkSuccess, setBulkSuccess] = React.useState<string | null>(null)
+    const [bulkError, setBulkError] = React.useState<string | null>(null)
+    const [showBulkDropdown, setShowBulkDropdown] = React.useState(false)
 
     // fetchOrgs takes targetPage explicitly — avoids double-fetch race condition
     const fetchOrgs = React.useCallback(async (targetPage: number) => {
@@ -286,6 +370,55 @@ export default function AdminOrganizationsPage() {
         fetchOrgs(next)
     }
 
+    // Bulk helpers
+    const allIds = data?.organizations.map((o) => o.id) ?? []
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id))
+    const someSelected = selectedIds.size > 0
+
+    const toggleSelectAll = () => {
+        if (allSelected) {
+            setSelectedIds(new Set())
+        } else {
+            setSelectedIds(new Set(allIds))
+        }
+    }
+
+    const toggleSelect = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation()
+        setSelectedIds((prev) => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const handleBulkTierChange = async () => {
+        if (selectedIds.size === 0) return
+        setBulkLoading(true)
+        setBulkError(null)
+        setBulkSuccess(null)
+        try {
+            await Promise.all(
+                [...selectedIds].map((id) =>
+                    fetch(`/api/admin/organizations/${id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'update_tier', tier: bulkTier }),
+                    })
+                )
+            )
+            setBulkSuccess(`Updated ${selectedIds.size} org${selectedIds.size !== 1 ? 's' : ''} to ${bulkTier}`)
+            setSelectedIds(new Set())
+            setShowBulkDropdown(false)
+            fetchOrgs(page)
+        } catch {
+            setBulkError('Bulk update failed. Some changes may not have been applied.')
+        } finally {
+            setBulkLoading(false)
+        }
+    }
+
     return (
         <div className="max-w-6xl mx-auto">
             {/* Header */}
@@ -305,6 +438,57 @@ export default function AdminOrganizationsPage() {
                     Refresh
                 </button>
             </div>
+
+            {/* Bulk action toolbar */}
+            {someSelected && (
+                <div className="mb-4 flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-xl">
+                    <span className="text-sm font-medium text-blue-800">
+                        {selectedIds.size} selected
+                    </span>
+                    <div className="flex items-center gap-2 ml-auto flex-wrap">
+                        {bulkSuccess && <span className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-2 py-1">{bulkSuccess}</span>}
+                        {bulkError && <span className="text-xs text-red-700 bg-red-50 border border-red-200 rounded px-2 py-1">{bulkError}</span>}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowBulkDropdown((v) => !v)}
+                                className="flex items-center gap-1.5 text-sm bg-white border border-slate-200 rounded-lg px-3 py-1.5 hover:bg-slate-50"
+                            >
+                                Change to tier
+                                <ChevronDown className="h-3.5 w-3.5" />
+                            </button>
+                            {showBulkDropdown && (
+                                <div className="absolute right-0 mt-1 z-10 bg-white border border-slate-200 rounded-lg shadow-lg p-2 min-w-[160px]">
+                                    {['free', 'pro', 'business'].map((t) => (
+                                        <button
+                                            key={t}
+                                            onClick={() => { setBulkTier(t); setShowBulkDropdown(false); }}
+                                            className={cn(
+                                                'w-full text-left px-3 py-1.5 text-sm rounded hover:bg-slate-50 capitalize',
+                                                bulkTier === t && 'font-semibold text-blue-700'
+                                            )}
+                                        >
+                                            {t}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={handleBulkTierChange}
+                            disabled={bulkLoading}
+                        >
+                            {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : `Apply to ${selectedIds.size}`}
+                        </Button>
+                        <button
+                            onClick={() => { setSelectedIds(new Set()); setBulkSuccess(null); setBulkError(null) }}
+                            className="text-xs text-slate-500 hover:text-slate-700"
+                        >
+                            Clear
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <Card>
                 <CardHeader className="pb-4">
@@ -346,6 +530,14 @@ export default function AdminOrganizationsPage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-slate-100 bg-slate-50">
+                                    <th className="px-4 py-3 w-10">
+                                        <button onClick={toggleSelectAll} className="flex items-center">
+                                            {allSelected
+                                                ? <CheckSquare className="h-4 w-4 text-blue-600" />
+                                                : <Square className="h-4 w-4 text-slate-400" />
+                                            }
+                                        </button>
+                                    </th>
                                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Organization</th>
                                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Tier</th>
                                     <th className="text-left px-4 py-3 font-semibold text-slate-600">Status</th>
@@ -371,7 +563,7 @@ export default function AdminOrganizationsPage() {
                                 {loading ? (
                                     Array.from({ length: 8 }).map((_, i) => (
                                         <tr key={i} className="border-b border-slate-50 animate-pulse">
-                                            {Array.from({ length: 7 }).map((__, j) => (
+                                            {Array.from({ length: 8 }).map((__, j) => (
                                                 <td key={j} className="px-4 py-3">
                                                     <div className="h-4 bg-slate-200 rounded w-full" />
                                                 </td>
@@ -380,7 +572,7 @@ export default function AdminOrganizationsPage() {
                                     ))
                                 ) : data?.organizations.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-12 text-center text-slate-400">
+                                        <td colSpan={8} className="px-4 py-12 text-center text-slate-400">
                                             <Building2 className="h-8 w-8 mx-auto mb-2 opacity-30" />
                                             <p>No organizations found</p>
                                         </td>
@@ -388,12 +580,22 @@ export default function AdminOrganizationsPage() {
                                 ) : (
                                     data?.organizations.map((org) => {
                                         const status = getSubscriptionStatus(org.subscription_tier, org.current_period_end)
+                                        const isChecked = selectedIds.has(org.id)
                                         return (
                                             <tr
                                                 key={org.id}
                                                 onClick={() => setSelectedOrg(org)}
-                                                className="border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer"
+                                                className={cn(
+                                                    'border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer',
+                                                    isChecked && 'bg-blue-50/50'
+                                                )}
                                             >
+                                                <td className="px-4 py-3" onClick={(e) => toggleSelect(org.id, e)}>
+                                                    {isChecked
+                                                        ? <CheckSquare className="h-4 w-4 text-blue-600" />
+                                                        : <Square className="h-4 w-4 text-slate-300" />
+                                                    }
+                                                </td>
                                                 <td className="px-4 py-3">
                                                     <div>
                                                         <p className="font-medium text-slate-900">{org.name}</p>
@@ -467,6 +669,7 @@ export default function AdminOrganizationsPage() {
                 onClose={() => setSelectedOrg(null)}
                 onUpdated={fetchOrgs}
                 currentPage={page}
+                onDeleted={() => { setSelectedIds(new Set()); fetchOrgs(1) }}
             />
         </div>
     )

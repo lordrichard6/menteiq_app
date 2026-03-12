@@ -24,6 +24,8 @@ import {
     Menu,
     ArrowLeft,
     ShieldCheck,
+    ClipboardList,
+    CreditCard,
 } from 'lucide-react'
 import * as React from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -35,6 +37,8 @@ const NAV_LINKS = [
     { href: '/admin', icon: LayoutDashboard, label: 'Overview', exact: true },
     { href: '/admin/organizations', icon: Building2, label: 'Organizations', exact: false },
     { href: '/admin/users', icon: Users, label: 'Users', exact: false },
+    { href: '/admin/billing', icon: CreditCard, label: 'Billing', exact: false },
+    { href: '/admin/audit-log', icon: ClipboardList, label: 'Audit Log', exact: false },
 ]
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

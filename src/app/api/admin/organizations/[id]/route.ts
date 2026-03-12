@@ -73,6 +73,7 @@ export async function PATCH(
                 .update({ subscription_tier: body.tier })
                 .eq('id', id)
             if (updateError) throw updateError
+            await client.from('admin_audit_log').insert({ action: 'update_tier', target_type: 'organization', target_id: id, details: { tier: body.tier } }).then(() => {}).catch(() => {})
             return NextResponse.json({ success: true })
         }
 
@@ -99,12 +100,66 @@ export async function PATCH(
                 .update({ token_balance: (org?.token_balance ?? 0) + amount })
                 .eq('id', id)
             if (updateError) throw updateError
+            await client.from('admin_audit_log').insert({ action: 'add_tokens', target_type: 'organization', target_id: id, details: { amount } }).then(() => {}).catch(() => {})
             return NextResponse.json({ success: true })
         }
 
         return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
     } catch (error) {
         Sentry.captureException(error, { tags: { route: 'admin/organizations/[id]' } })
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    }
+}
+
+// ─── DELETE /api/admin/organizations/[id] ────────────────────────────────────
+// Permanently deletes an organization and all its data. Irreversible.
+// Cascade order: profiles → auth.users → org-linked tables → organizations
+
+export async function DELETE(
+    _request: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    try {
+        const { error, status, client } = await getAdminSupabase()
+        if (error || !client) {
+            return NextResponse.json({ error }, { status: status ?? 500 })
+        }
+
+        const { id } = await params
+        if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+        // 1. Get all user IDs in this org (for auth deletion)
+        const { data: members } = await client
+            .from('profiles')
+            .select('id')
+            .eq('tenant_id', id)
+
+        const memberIds = (members ?? []).map((m) => m.id)
+
+        // 2. Delete the organization row — DB cascade handles related tables
+        //    (contacts, projects, invoices, tasks, documents, etc.)
+        const { error: orgError } = await client
+            .from('organizations')
+            .delete()
+            .eq('id', id)
+        if (orgError) throw orgError
+
+        // 3. Delete each user from Supabase Auth (profiles already cascade-deleted)
+        for (const userId of memberIds) {
+            await client.auth.admin.deleteUser(userId)
+        }
+
+        // 4. Log to admin audit log
+        await client.from('admin_audit_log').insert({
+            action: 'delete_organization',
+            target_type: 'organization',
+            target_id: id,
+            details: { member_count: memberIds.length },
+        }).throwOnError().then(() => {}).catch(() => {}) // non-blocking
+
+        return NextResponse.json({ success: true, deleted_users: memberIds.length })
+    } catch (error) {
+        Sentry.captureException(error, { tags: { route: 'admin/organizations/[id] DELETE' } })
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
     }
 }
