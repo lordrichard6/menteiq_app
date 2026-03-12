@@ -30,12 +30,11 @@ export const metadata: Metadata = {
   authors: [{ name: "MenteIQ" }],
   creator: "MenteIQ",
   metadataBase: new URL("https://app.menteiq.ch"),
-  alternates: {
-    canonical: "/",
-  },
+  // Default: allow public pages (login, signup, privacy, terms) to be indexed.
+  // Authenticated routes override this in the admin layout with index:false.
   robots: {
-    index: false, // App is gated — do not index authenticated routes
-    follow: false,
+    index: true,
+    follow: true,
   },
   openGraph: {
     type: "website",
@@ -62,8 +61,11 @@ export const metadata: Metadata = {
     images: ["/images/landing/hero-dashboard.webp"],
   },
   icons: {
-    icon: "/favicon.ico",
-    apple: "/menteiq_logo_white.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192x192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: "/apple-touch-icon.png",
     shortcut: "/favicon.ico",
   },
   manifest: "/site.webmanifest",

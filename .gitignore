@@ -44,3 +44,8 @@ next-env.d.ts
 
 # lint output (generated, not committed)
 lint-results.json
+
+# Playwright
+/e2e/.playwright/
+/playwright-report/
+/test-results/

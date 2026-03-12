@@ -1,5 +1,12 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { ArrowLeft } from "lucide-react"
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "MenteIQ Terms of Service — your rights and responsibilities when using the MenteIQ platform.",
+  alternates: { canonical: "/terms" },
+};
 
 export default function TermsPage() {
     return (
@@ -17,7 +24,7 @@ export default function TermsPage() {
                     <section className="mb-8">
                         <h2 className="text-2xl font-bold text-[#3D4A67] mb-4">1. Acceptance of Terms</h2>
                         <p className="text-slate-600 mb-4">
-                            By accessing and using MenteIQ ("the Service"), a product of Lopes2tech, you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.
+                            By accessing and using MenteIQ (&ldquo;the Service&rdquo;), a product of Lopes2tech, you accept and agree to be bound by the terms and provision of this agreement. In addition, when using these particular services, you shall be subject to any posted guidelines or rules applicable to such services.
                         </p>
                     </section>
 

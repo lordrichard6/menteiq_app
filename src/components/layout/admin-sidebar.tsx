@@ -183,20 +183,14 @@ export function AdminSidebar() {
   // Fetch authenticated user and role
   React.useEffect(() => {
     const fetchUser = async () => {
-      const supabase = createClient();
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
-        setUser({
-          name: authUser.user_metadata?.full_name || authUser.user_metadata?.name,
-          email: authUser.email,
-        });
-        // Check if platform admin
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', authUser.id)
-          .single();
-        setIsPlatformAdmin(profile?.role === 'platform_admin');
+      // Use /api/me which uses the service role — bypasses any RLS edge-cases
+      // that can silently return null when querying profiles from the browser client.
+      const res = await fetch('/api/me');
+      if (!res.ok) return;
+      const me = await res.json();
+      if (me?.email) {
+        setUser({ name: me.full_name, email: me.email });
+        setIsPlatformAdmin(me.role === 'platform_admin');
       }
     };
     fetchUser();

@@ -3,7 +3,8 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useDropzone } from 'react-dropzone'
 import Papa from 'papaparse'
-import * as XLSX from 'xlsx'
+// ExcelJS is lazy-loaded on demand (only when user uploads an .xlsx file)
+// to avoid including the ~750KB library in the initial JS bundle.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Upload, FileSpreadsheet, File, CheckCircle2, AlertCircle, ArrowRight, ArrowLeft } from 'lucide-react'
@@ -129,21 +130,27 @@ export function ImportContactsDialog({ onImportComplete }: ImportContactsDialogP
           }
         })
       } else if (fileType === 'xlsx') {
-        // Parse Excel
+        // Parse Excel — dynamically import ExcelJS to keep it out of the initial bundle.
+        const ExcelJS = await import('exceljs')
         const data = await file.arrayBuffer()
-        const workbook = XLSX.read(data, { type: 'array' })
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]]
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 })
+        const workbook = new ExcelJS.Workbook()
+        await workbook.xlsx.load(data)
+        const worksheet = workbook.worksheets[0]
 
-        if (jsonData.length < 2) {
+        // ExcelJS rows are 1-indexed; row.values[0] is always null (it uses 1-based column indices)
+        const allRows: unknown[][] = []
+        worksheet.eachRow(row => {
+          allRows.push((row.values as unknown[]).slice(1)) // drop index-0 null
+        })
+
+        if (allRows.length < 2) {
           setError('Excel file must have at least 2 rows (header + data).')
           return
         }
 
-        const headers = (jsonData[0] as unknown[]).map(String)
-        const rows = jsonData.slice(1).map((row: unknown) => {
+        const headers = allRows[0].map(String)
+        const rows = allRows.slice(1).map((rowArr: unknown[]) => {
           const obj: Record<string, unknown> = {}
-          const rowArr = row as unknown[]
           headers.forEach((header, index) => {
             obj[header] = rowArr[index] ?? ''
           })

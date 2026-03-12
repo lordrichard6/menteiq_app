@@ -21,8 +21,15 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 import { AddContactDialog } from '@/components/contacts/add-contact-dialog'
-import { ImportContactsDialog } from '@/components/contacts/import-contacts-dialog'
+import dynamic from 'next/dynamic'
 import { ExportContactsDialog } from '@/components/contacts/export-contacts-dialog'
+
+// Lazy-load the import dialog — it carries xlsx (~550KB) which must not
+// land in the initial contacts page bundle.
+const ImportContactsDialog = dynamic(
+  () => import('@/components/contacts/import-contacts-dialog').then(m => ({ default: m.ImportContactsDialog })),
+  { ssr: false }
+)
 import { KanbanBoard } from '@/components/contacts/kanban-board'
 import {
     AlertDialog,

@@ -1,4 +1,17 @@
+import type { Metadata } from "next";
 import { AdminSidebar } from "@/components/layout/admin-sidebar";
+
+// Authenticated app routes must never be indexed by search engines.
+export const metadata: Metadata = {
+  robots: {
+    index: false,
+    follow: false,
+    googleBot: {
+      index: false,
+      follow: false,
+    },
+  },
+};
 
 export default function DashboardLayout({
     children,
