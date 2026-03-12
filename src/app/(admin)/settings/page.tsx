@@ -397,8 +397,8 @@ export default function SettingsPage() {
     if (loading) {
         return (
             <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#3D4A67]" />
-                <span className="ml-2 text-slate-500">Loading settings...</span>
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="ml-2 text-muted-foreground">Loading settings...</span>
             </div>
         )
     }
@@ -409,13 +409,13 @@ export default function SettingsPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[#3D4A67]">Settings</h1>
-                    <p className="text-slate-600">Manage your account and organization</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
+                    <p className="text-muted-foreground">Manage your account and organization</p>
                 </div>
                 <Button
                     onClick={handleSave}
                     disabled={saving || !isDirty}
-                    className="bg-[#3D4A67] hover:bg-[#2D3A57]"
+                    className="bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                     {saving ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -435,21 +435,21 @@ export default function SettingsPage() {
 
             <div className="space-y-6">
                 {/* ── Profile ──────────────────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <UserCircle className="h-5 w-5 text-[#3D4A67]" />
+                        <UserCircle className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67]">Profile</CardTitle>
-                            <CardDescription className="text-slate-600">Your personal information</CardDescription>
+                            <CardTitle className="text-primary">Profile</CardTitle>
+                            <CardDescription className="text-muted-foreground">Your personal information</CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center gap-6">
                             {/* Avatar */}
                             <div className="relative group">
-                                <Avatar className="h-20 w-20 border-2 border-slate-200">
+                                <Avatar className="h-20 w-20 border-2 border-border">
                                     <AvatarImage src={avatarUrl || undefined} alt={profileName || 'Avatar'} />
-                                    <AvatarFallback className="text-lg bg-[#3D4A67] text-white">
+                                    <AvatarFallback className="text-lg bg-primary text-primary-foreground">
                                         {getInitials(profileName, profileEmail)}
                                     </AvatarFallback>
                                 </Avatar>
@@ -489,9 +489,9 @@ export default function SettingsPage() {
                                     <Input
                                         value={profileEmail}
                                         disabled
-                                        className="bg-slate-50 text-slate-500"
+                                        className="bg-muted text-muted-foreground"
                                     />
-                                    <p className="text-xs text-slate-400">Managed through authentication provider</p>
+                                    <p className="text-xs text-muted-foreground">Managed through authentication provider</p>
                                 </div>
                             </div>
                         </div>
@@ -499,12 +499,12 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* ── Organization ─────────────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <Building2 className="h-5 w-5 text-[#3D4A67]" />
+                        <Building2 className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67]">Organization</CardTitle>
-                            <CardDescription className="text-slate-600">
+                            <CardTitle className="text-primary">Organization</CardTitle>
+                            <CardDescription className="text-muted-foreground">
                                 Company details used on invoices and PDFs
                             </CardDescription>
                         </div>
@@ -607,12 +607,12 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* ── Bank Details ─────────────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <CreditCard className="h-5 w-5 text-[#3D4A67]" />
+                        <CreditCard className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67]">Bank Details</CardTitle>
-                            <CardDescription className="text-slate-600">
+                            <CardTitle className="text-primary">Bank Details</CardTitle>
+                            <CardDescription className="text-muted-foreground">
                                 Payment information for invoices and QR-Bills
                             </CardDescription>
                         </div>
@@ -631,7 +631,7 @@ export default function SettingsPage() {
                                     Invalid IBAN format. Example: CH93 0076 2011 6238 5295 7
                                 </p>
                             ) : (
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-muted-foreground">
                                     Used for Swiss QR-Bills and EU SEPA invoices
                                 </p>
                             )}
@@ -660,12 +660,12 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* ── Invoice Preferences ──────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <Receipt className="h-5 w-5 text-[#3D4A67]" />
+                        <Receipt className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67]">Invoice Preferences</CardTitle>
-                            <CardDescription className="text-slate-600">
+                            <CardTitle className="text-primary">Invoice Preferences</CardTitle>
+                            <CardDescription className="text-muted-foreground">
                                 Default settings applied when creating new invoices
                             </CardDescription>
                         </div>
@@ -680,7 +680,7 @@ export default function SettingsPage() {
                                     placeholder="INV"
                                     maxLength={10}
                                 />
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-muted-foreground">
                                     e.g., {billing.invoice_prefix || 'INV'}-2026-0001
                                 </p>
                             </div>
@@ -722,12 +722,12 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* ── Subscription & Usage ─────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <Crown className="h-5 w-5 text-[#3D4A67]" />
+                        <Crown className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67]">Subscription & Usage</CardTitle>
-                            <CardDescription className="text-slate-600">
+                            <CardTitle className="text-primary">Subscription & Usage</CardTitle>
+                            <CardDescription className="text-muted-foreground">
                                 Your current plan and AI token usage
                             </CardDescription>
                         </div>
@@ -737,8 +737,8 @@ export default function SettingsPage() {
                             {/* Left: plan info */}
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3">
-                                    <span className="text-sm text-slate-500">Current Plan</span>
-                                    <Badge className="bg-[#3D4A67] text-white capitalize">
+                                    <span className="text-sm text-muted-foreground">Current Plan</span>
+                                    <Badge className="bg-primary text-primary-foreground capitalize">
                                         {subscriptionTier}
                                     </Badge>
                                 </div>
@@ -748,7 +748,7 @@ export default function SettingsPage() {
                                         variant="outline"
                                         onClick={handleOpenPortal}
                                         disabled={portalLoading}
-                                        className="border-slate-300"
+                                        className="border-border"
                                     >
                                         {portalLoading ? (
                                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -760,9 +760,9 @@ export default function SettingsPage() {
                                 )}
 
                                 {subscriptionTier === 'free' && (
-                                    <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-sm text-slate-600">
+                                    <div className="rounded-lg bg-muted border border-border p-3 text-sm text-muted-foreground">
                                         <p className="font-medium mb-1">Free Plan</p>
-                                        <p className="text-xs text-slate-500">
+                                        <p className="text-xs text-muted-foreground">
                                             Upgrade to Pro for 50x more AI tokens, GPT-4o, Claude, and more.
                                         </p>
                                     </div>
@@ -776,37 +776,37 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* ── Team Members ─────────────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <Users className="h-5 w-5 text-[#3D4A67]" />
+                        <Users className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67]">Team</CardTitle>
-                            <CardDescription className="text-slate-600">
+                            <CardTitle className="text-primary">Team</CardTitle>
+                            <CardDescription className="text-muted-foreground">
                                 Members in your organization
                             </CardDescription>
                         </div>
                     </CardHeader>
                     <CardContent>
                         {teamMembers.length === 0 ? (
-                            <p className="text-sm text-slate-500 py-4 text-center">No team members found.</p>
+                            <p className="text-sm text-muted-foreground py-4 text-center">No team members found.</p>
                         ) : (
-                            <div className="divide-y divide-slate-100">
+                            <div className="divide-y divide-border">
                                 {teamMembers.map(member => (
                                     <div key={member.id} className="flex items-center gap-4 py-3 first:pt-0 last:pb-0">
                                         <Avatar className="h-9 w-9">
                                             <AvatarImage src={member.avatar_url || undefined} />
-                                            <AvatarFallback className="bg-slate-200 text-slate-600 text-sm">
+                                            <AvatarFallback className="bg-muted text-muted-foreground text-sm">
                                                 {getInitials(member.full_name, member.email)}
                                             </AvatarFallback>
                                         </Avatar>
                                         <div className="flex-1 min-w-0">
-                                            <p className="text-sm font-medium text-slate-800 truncate">
+                                            <p className="text-sm font-medium text-foreground truncate">
                                                 {member.full_name || 'Unnamed'}
                                                 {member.id === userId && (
-                                                    <span className="text-xs text-slate-400 ml-2">(you)</span>
+                                                    <span className="text-xs text-muted-foreground ml-2">(you)</span>
                                                 )}
                                             </p>
-                                            <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                                            <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                                         </div>
                                         <Badge variant="outline" className="capitalize shrink-0">
                                             {member.role}
@@ -819,12 +819,12 @@ export default function SettingsPage() {
                 </Card>
 
                 {/* ── Appearance ───────────────────────────────────────────── */}
-                <Card className="border-slate-200 bg-white shadow-sm dark:border-[#1E2E47] dark:bg-[#131E30]">
+                <Card className="border-border bg-card shadow-sm">
                     <CardHeader className="flex flex-row items-center gap-3">
-                        <Palette className="h-5 w-5 text-[#3D4A67] dark:text-[#4A7FD4]" />
+                        <Palette className="h-5 w-5 text-primary" />
                         <div>
-                            <CardTitle className="text-[#3D4A67] dark:text-white">Appearance</CardTitle>
-                            <CardDescription className="text-slate-600 dark:text-slate-400">
+                            <CardTitle className="text-primary">Appearance</CardTitle>
+                            <CardDescription className="text-muted-foreground">
                                 Choose how MenteIQ looks for you
                             </CardDescription>
                         </div>
@@ -841,8 +841,8 @@ export default function SettingsPage() {
                                         onClick={() => setTheme(opt.value)}
                                         className={`group relative flex flex-col items-center gap-3 rounded-xl border-2 p-4 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#3D4A67] dark:focus-visible:ring-[#4A7FD4] ${
                                             isActive
-                                                ? 'border-[#3D4A67] dark:border-[#4A7FD4] ring-2 ring-[#3D4A67]/20 dark:ring-[#4A7FD4]/30'
-                                                : 'border-slate-200 dark:border-[#1E2E47] hover:border-slate-300 dark:hover:border-[#2A3A56]'
+                                                ? 'border-primary ring-2 ring-primary/20'
+                                                : 'border-border hover:border-primary/40'
                                         }`}
                                     >
                                         {/* Mini preview window */}
@@ -863,18 +863,18 @@ export default function SettingsPage() {
 
                                         {/* Label */}
                                         <div className="flex items-center gap-2">
-                                            <Icon className={`h-4 w-4 ${isActive ? 'text-[#3D4A67] dark:text-[#4A7FD4]' : 'text-slate-400'}`} />
-                                            <span className={`text-sm font-medium ${isActive ? 'text-[#3D4A67] dark:text-[#4A7FD4]' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            <Icon className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                                            <span className={`text-sm font-medium ${isActive ? 'text-primary' : 'text-foreground'}`}>
                                                 {opt.label}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 text-center">
+                                        <p className="text-xs text-muted-foreground text-center">
                                             {opt.description}
                                         </p>
 
                                         {/* Active indicator */}
                                         {isActive && (
-                                            <span className="absolute top-2.5 right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#3D4A67] dark:bg-[#4A7FD4]">
+                                            <span className="absolute top-2.5 right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary">
                                                 <svg className="h-2.5 w-2.5 text-white" fill="currentColor" viewBox="0 0 12 12">
                                                     <path d="M10 3L5 8.5 2 5.5l-1 1L5 10.5l6-7-1-0.5z" />
                                                 </svg>
@@ -884,7 +884,7 @@ export default function SettingsPage() {
                                 )
                             })}
                         </div>
-                        <p className="mt-3 text-xs text-slate-400 dark:text-slate-500">
+                        <p className="mt-3 text-xs text-muted-foreground">
                             Theme preference is saved locally in your browser.
                         </p>
                     </CardContent>
@@ -895,7 +895,7 @@ export default function SettingsPage() {
                     <Button
                         onClick={handleSave}
                         disabled={saving || !isDirty}
-                        className="bg-[#3D4A67] hover:bg-[#2D3A57]"
+                        className="bg-primary text-primary-foreground hover:bg-primary/90"
                     >
                         {saving ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />

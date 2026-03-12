@@ -19,7 +19,7 @@ export default function DashboardLayout({
     children: React.ReactNode
 }) {
     return (
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-background">
             <AdminSidebar />
 
             {/* Main content - Adjusted for mobile header (pt-16) and desktop sidebar (md:pl-64) */}
